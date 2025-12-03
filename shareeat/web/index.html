@@ -1,19 +1,6 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
@@ -31,8 +18,38 @@
 
   <title>shareeat</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- ========================================================= -->
+  <!-- 🔥 REQUIRED: Firebase COMPAT SDK (FlutterFire Web depends on this) -->
+  <!-- ========================================================= -->
+
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics-compat.js"></script>
+
+  <!-- ========================================================= -->
+  <!-- 🔥 Initialize Firebase (Required BEFORE flutter_bootstrap.js) -->
+  <!-- ========================================================= -->
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAmT1I-6eal4oeboiBzZgZyxSC9HJm00g4",
+      authDomain: "shareeat-d999c.firebaseapp.com",
+      projectId: "shareeat-d999c",
+      storageBucket: "shareeat-d999c.firebasestorage.app",
+      messagingSenderId: "903892114230",
+      appId: "1:903892114230:web:e5a82af521351c82577197",
+      measurementId: "G-ZES19HNG6S"
+    };
+
+    // Initialize Firebase (Compat)
+    firebase.initializeApp(firebaseConfig);
+  </script>
+  
 </head>
+
 <body>
+  <!-- Flutter bootloader (MUST COME AFTER Firebase init) -->
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
