@@ -9,7 +9,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final emailController = TextEditingController(); // field labelled "Username" in UI
+  final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
@@ -45,7 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 40),
 
                 _inputField(
-                  "Email", // or "Username (use your email)"
+                  "Email",
                   emailController,
                   validator: (v) =>
                       v == null || !v.contains("@") ? "Invalid email" : null,
@@ -134,21 +134,27 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
+
     try {
+      // Login
       await _userRepo.login(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
 
       if (!mounted) return;
+
+      // Success message
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Login successful")),
       );
 
-      // TODO: navigate to your real home/profile screen
-      // Navigator.pushReplacementNamed(context, '/home');
+      // 🔥 Redirect to home page
+      Navigator.pushReplacementNamed(context, '/home');
+
     } catch (e) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Login failed: $e")),
       );

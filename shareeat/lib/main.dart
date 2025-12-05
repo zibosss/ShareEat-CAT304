@@ -5,11 +5,12 @@ import 'firebase_options.dart';
 import 'features/user_registration/presentation/welcome_screen.dart';
 import 'features/user_registration/presentation/login_screen.dart';
 import 'features/user_registration/presentation/registration_screen.dart';
+import 'features/user_registration/presentation/home_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 🔥 THIS IS WHERE YOU PUT IT
+  // Initialize Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -29,6 +30,7 @@ class ShareEatApp extends StatelessWidget {
         '/': (context) => const WelcomeScreen(),
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegistrationScreen(),
+        '/home': (context) => const HomeScreen(),     // <-- Added home route
       },
     );
   }
