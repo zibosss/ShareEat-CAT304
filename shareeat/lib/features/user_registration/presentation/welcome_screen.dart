@@ -14,7 +14,7 @@ class WelcomeScreen extends StatelessWidget {
               const SizedBox(height: 40),
 
               Image.asset(
-                "assets/images/food.png", // <-- your bowl illustration
+                "assets/images/food.jpg", // <-- your bowl illustration
                 height: 200,
               ),
 

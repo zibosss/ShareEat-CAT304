@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../data/user_repository.dart';        // adjust path if needed
+import '../data/user_repository.dart';
 
 class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({super.key});
@@ -53,44 +53,29 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 ),
                 const SizedBox(height: 40),
 
+                _inputField("Username", usernameController,
+                    validator: _notEmpty),
+                _inputField("Password", passwordController,
+                    isPassword: true,
+                    validator: (v) =>
+                        v == null || v.length < 6 ? "Min 6 characters" : null),
                 _inputField(
-                  "Username",
-                  usernameController,
-                  validator: _notEmpty,
-                ),
-                _inputField(
-                  "Password",
-                  passwordController,
-                  isPassword: true,
-                  validator: (v) =>
-                      v == null || v.length < 6 ? "Min 6 characters" : null,
-                ),
-                _inputField(
-                  "Confirm your password",
-                  confirmPasswordController,
-                  isPassword: true,
-                  validator: (v) =>
-                      v != passwordController.text ? "Password not match" : null,
-                ),
-                _inputField(
-                  "Full Name",
-                  fullNameController,
-                  validator: _notEmpty,
-                ),
-                _inputField(
-                  "Phone Number",
-                  phoneController,
-                  validator: _notEmpty,
-                ),
-                _inputField(
-                  "Email Address",
-                  emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (v) =>
-                      v == null || !v.contains("@") ? "Invalid email" : null,
-                ),
+                    "Confirm your password", confirmPasswordController,
+                    isPassword: true,
+                    validator: (v) => v != passwordController.text
+                        ? "Password not match"
+                        : null),
+                _inputField("Full Name", fullNameController,
+                    validator: _notEmpty),
+                _inputField("Phone Number", phoneController,
+                    validator: _notEmpty),
+                _inputField("Email Address", emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    validator: (v) =>
+                        v == null || !v.contains("@") ? "Invalid email" : null),
 
                 const SizedBox(height: 35),
+
                 SizedBox(
                   width: double.infinity,
                   height: 50,
@@ -109,8 +94,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                           )
                         : const Text(
                             "CREATE AN ACCOUNT",
-                            style:
-                                TextStyle(color: Colors.white, fontSize: 16),
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600),
                           ),
                   ),
                 ),
@@ -141,17 +128,22 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       );
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Account created successfully")),
-      );
+
+      // Stop loading BEFORE navigation
+      setState(() => _isLoading = false);
+
+      // 🚀 Navigate instantly — NO SNACKBAR
       Navigator.pushReplacementNamed(context, '/login');
+
     } catch (e) {
       if (!mounted) return;
+
+      setState(() => _isLoading = false);
+
+      // Show error
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Registration failed: $e")),
       );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 
