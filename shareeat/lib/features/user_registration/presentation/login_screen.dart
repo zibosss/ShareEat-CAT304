@@ -1,3 +1,5 @@
+// lib/features/user_registration/presentation/login_screen.dart
+
 import 'package:flutter/material.dart';
 import '../data/user_repository.dart';
 
@@ -61,11 +63,15 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 5),
                 Align(
                   alignment: Alignment.centerRight,
-                  child: Text(
-                    "Forgot your password?",
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade600,
+                  child: GestureDetector(
+                    onTap: _showForgotPasswordDialog,
+                    child: Text(
+                      "Forgot your password?",
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.blue.shade700,
+                        decoration: TextDecoration.underline,
+                      ),
                     ),
                   ),
                 ),
@@ -89,8 +95,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           )
                         : const Text(
                             "LOG IN",
-                            style:
-                                TextStyle(color: Colors.white, fontSize: 16),
+                            style: TextStyle(
+                                color: Colors.white, fontSize: 16),
                           ),
                   ),
                 ),
@@ -136,7 +142,6 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Login
       await _userRepo.login(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
@@ -144,12 +149,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
 
-      // Success message
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Login successful")),
       );
 
-      // 🔥 Redirect to home page
       Navigator.pushReplacementNamed(context, '/home');
 
     } catch (e) {
@@ -161,5 +164,61 @@ class _LoginScreenState extends State<LoginScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  /// 🔥 FORGOT PASSWORD DIALOG
+  void _showForgotPasswordDialog() {
+    final resetEmailController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Reset Password"),
+          content: TextField(
+            controller: resetEmailController,
+            decoration: const InputDecoration(
+              hintText: "Enter your email",
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () async {
+                final email = resetEmailController.text.trim();
+
+                if (email.isEmpty || !email.contains("@")) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text("Please enter a valid email address")),
+                  );
+                  return;
+                }
+
+                try {
+                  await _userRepo.resetPassword(email);
+
+                  if (!mounted) return;
+
+                  Navigator.pop(context);
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Password reset email sent to $email")),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Failed to send reset email: $e")),
+                  );
+                }
+              },
+              child: const Text("Send"),
+            ),
+          ],
+        );
+      },
+    );
   }
 }
