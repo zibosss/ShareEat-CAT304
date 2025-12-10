@@ -1,7 +1,31 @@
 import 'package:flutter/material.dart';
+import 'profile_screen.dart';  // 👈 Make sure this path is correct
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  int _selectedIndex = 0;
+
+  void _onNavTap(int index) {
+    setState(() => _selectedIndex = index);
+
+    if (index == 3) {
+      // 👤 Profile Button
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ProfileScreen()),
+      );
+    }
+
+    // You can add other navigation later:
+    // if (index == 1) => Add Post
+    // if (index == 2) => My Bookings / History
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,17 +74,13 @@ class HomeScreen extends StatelessWidget {
 
           const SizedBox(height: 30),
 
-          // EMPTY STATE (No food posts yet)
+          // EMPTY STATE
           Expanded(
             child: Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: const [
-                  Icon(
-                    Icons.fastfood_outlined,
-                    size: 55,
-                    color: Colors.grey,
-                  ),
+                  Icon(Icons.fastfood_outlined, size: 55, color: Colors.grey),
                   SizedBox(height: 15),
                   Text(
                     "No food posts available yet",
@@ -94,10 +114,10 @@ class HomeScreen extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _navButton(Icons.home, true),
-            _navButton(Icons.add_circle_outline, false),
-            _navButton(Icons.book_online, false),
-            _navButton(Icons.person, false),
+            _navButton(Icons.home, 0),
+            _navButton(Icons.add_circle_outline, 1),
+            _navButton(Icons.book_online, 2),
+            _navButton(Icons.person, 3),
           ],
         ),
       ),
@@ -105,11 +125,16 @@ class HomeScreen extends StatelessWidget {
   }
 
   // bottom nav button
-  Widget _navButton(IconData icon, bool active) {
-    return Icon(
-      icon,
-      color: active ? Colors.white : Colors.white70,
-      size: 28,
+  Widget _navButton(IconData icon, int index) {
+    final bool isActive = _selectedIndex == index;
+
+    return InkWell(
+      onTap: () => _onNavTap(index),
+      child: Icon(
+        icon,
+        color: isActive ? Colors.white : Colors.white70,
+        size: 28,
+      ),
     );
   }
 }

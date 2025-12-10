@@ -1,4 +1,9 @@
+// lib/features/user_registration/presentation/registration_screen.dart
+
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+
 import '../data/user_repository.dart';
 
 class RegistrationScreen extends StatefulWidget {
@@ -20,6 +25,22 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   bool _isLoading = false;
 
   final _userRepo = UserRepository();
+
+  // Profile image bytes
+  Uint8List? _profileImageBytes;
+
+  // Gender value
+  String? _selectedGender;
+
+  Future<void> _pickImage() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? file = await picker.pickImage(source: ImageSource.gallery);
+
+    if (file != null) {
+      final bytes = await file.readAsBytes();
+      setState(() => _profileImageBytes = bytes);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,12 +67,25 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 const Text(
                   "Create an account\nto start sharing food",
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 30),
+
+                // Profile Picture Picker
+                GestureDetector(
+                  onTap: _pickImage,
+                  child: CircleAvatar(
+                    radius: 55,
+                    backgroundColor: const Color(0xFF7A2B93),
+                    child: _profileImageBytes == null
+                        ? const Icon(Icons.camera_alt, color: Colors.white, size: 35)
+                        : CircleAvatar(
+                            radius: 52,
+                            backgroundImage: MemoryImage(_profileImageBytes!),
+                          ),
                   ),
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 20),
 
                 _inputField("Username", usernameController,
                     validator: _notEmpty),
@@ -59,11 +93,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     isPassword: true,
                     validator: (v) =>
                         v == null || v.length < 6 ? "Min 6 characters" : null),
-                _inputField(
-                    "Confirm your password", confirmPasswordController,
+                _inputField("Confirm Password", confirmPasswordController,
                     isPassword: true,
                     validator: (v) => v != passwordController.text
-                        ? "Password not match"
+                        ? "Passwords do not match"
                         : null),
                 _inputField("Full Name", fullNameController,
                     validator: _notEmpty),
@@ -71,11 +104,34 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     validator: _notEmpty),
                 _inputField("Email Address", emailController,
                     keyboardType: TextInputType.emailAddress,
+                    validator: (v) => v == null || !v.contains("@")
+                        ? "Invalid email"
+                        : null),
+
+                // Gender Dropdown
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  margin: const EdgeInsets.only(bottom: 18),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE6E6E6),
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: DropdownButtonFormField<String>(
+                    value: _selectedGender,
+                    hint: const Text("Select Gender"),
+                    decoration: const InputDecoration(border: InputBorder.none),
+                    items: ["Male", "Female"]
+                        .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                        .toList(),
                     validator: (v) =>
-                        v == null || !v.contains("@") ? "Invalid email" : null),
+                        v == null ? "Please select your gender" : null,
+                    onChanged: (value) => setState(() => _selectedGender = value),
+                  ),
+                ),
 
-                const SizedBox(height: 35),
+                const SizedBox(height: 25),
 
+                // Register Button
                 SizedBox(
                   width: double.infinity,
                   height: 50,
@@ -89,19 +145,17 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     onPressed: _isLoading ? null : _onRegisterPressed,
                     child: _isLoading
                         ? const CircularProgressIndicator(
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.white),
-                          )
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white))
                         : const Text(
                             "CREATE AN ACCOUNT",
                             style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600),
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                   ),
                 ),
-                const SizedBox(height: 20),
               ],
             ),
           ),
@@ -116,6 +170,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   Future<void> _onRegisterPressed() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_profileImageBytes == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please upload a profile picture")),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
@@ -125,22 +186,19 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         fullName: fullNameController.text.trim(),
         username: usernameController.text.trim(),
         contactNumber: phoneController.text.trim(),
+        gender: _selectedGender!,
+        profileImageBytes: _profileImageBytes!,
       );
 
       if (!mounted) return;
-
-      // Stop loading BEFORE navigation
       setState(() => _isLoading = false);
 
-      // 🚀 Navigate instantly — NO SNACKBAR
       Navigator.pushReplacementNamed(context, '/login');
-
     } catch (e) {
       if (!mounted) return;
 
       setState(() => _isLoading = false);
 
-      // Show error
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Registration failed: $e")),
       );
@@ -165,8 +223,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           hintText: label,
           filled: true,
           fillColor: const Color(0xFFE6E6E6),
-          contentPadding:
-              const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+          contentPadding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(30),
             borderSide: BorderSide.none,

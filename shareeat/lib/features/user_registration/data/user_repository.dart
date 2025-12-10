@@ -1,48 +1,52 @@
 // lib/features/user_registration/data/user_repository.dart
-import 'package:cloud_firestore/cloud_firestore.dart';
+
+import 'dart:typed_data';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 import 'user_model.dart';
 
 class UserRepository {
-  final FirebaseAuth _auth;
-  final FirebaseFirestore _firestore;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final DatabaseReference _db = FirebaseDatabase.instance.ref();
+  final FirebaseStorage _storage = FirebaseStorage.instance;
 
-  UserRepository({
-    FirebaseAuth? auth,
-    FirebaseFirestore? firestore,
-  })  : _auth = auth ?? FirebaseAuth.instance,
-        _firestore = firestore ?? FirebaseFirestore.instance;
-
-  /// Register new user (Auth + Firestore)
+  /// Register new user (Auth + Realtime DB + Storage)
   Future<AppUser> registerUser({
     required String email,
     required String password,
     required String fullName,
     required String username,
     required String contactNumber,
+    required String gender,
+    required Uint8List profileImageBytes,
   }) async {
-    // Auth
-    final userCredential = await _auth.createUserWithEmailAndPassword(
+    final userCred = await _auth.createUserWithEmailAndPassword(
       email: email,
       password: password,
     );
-    final uid = userCredential.user!.uid;
+    final uid = userCred.user!.uid;
 
-    // Profile in Firestore
+    final storageRef = _storage.ref().child("user_profiles/$uid/profile.jpg");
+    await storageRef.putData(profileImageBytes);
+    final imageUrl = await storageRef.getDownloadURL();
+
     final appUser = AppUser(
       uid: uid,
       fullName: fullName,
       username: username,
       email: email,
       contactNumber: contactNumber,
+      gender: gender,
+      profileImageUrl: imageUrl,
     );
 
-    await _firestore.collection('users').doc(uid).set(appUser.toMap());
+    await _db.child("users/$uid").set(appUser.toMap());
     return appUser;
   }
 
-  /// Login by email + password
+  /// Login
   Future<UserCredential> login({
     required String email,
     required String password,
@@ -50,16 +54,26 @@ class UserRepository {
     return _auth.signInWithEmailAndPassword(email: email, password: password);
   }
 
+  /// 🔥 RESET PASSWORD (NEW)
+  Future<void> resetPassword(String email) async {
+    await _auth.sendPasswordResetEmail(email: email);
+  }
+
+  /// Load current user profile
   Future<AppUser?> getCurrentUserProfile() async {
     final user = _auth.currentUser;
     if (user == null) return null;
-    final doc = await _firestore.collection('users').doc(user.uid).get();
-    if (!doc.exists) return null;
-    return AppUser.fromMap(doc.data()!);
+
+    final snapshot = await _db.child("users/${user.uid}").get();
+    if (!snapshot.exists) return null;
+
+    final data = Map<String, dynamic>.from(snapshot.value as Map);
+    return AppUser.fromMap(data);
   }
 
+  /// Update DB only
   Future<void> updateUserProfile(AppUser user) async {
-    await _firestore.collection('users').doc(user.uid).update(user.toMap());
+    await _db.child("users/${user.uid}").update(user.toMap());
   }
 
   Future<void> signOut() async {
