@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "903892114230",
+    "project_id": "shareeat-d999c",
+    "storage_bucket": "shareeat-d999c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:903892114230:android:4d9dfb755cc37896577197",
+        "android_client_info": {
+          "package_name": "com.example.shareeat"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA2iFmW5E0TE37Nf4YsaaFUUbZQ73o2OAo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
