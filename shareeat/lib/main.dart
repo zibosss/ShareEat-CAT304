@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
@@ -10,11 +11,14 @@ import 'features/user_registration/presentation/home_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Prevent duplicate initialization
-  if (Firebase.apps.isEmpty) {
+  if (kIsWeb) {
+    // Web needs explicit options
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+  } else {
+    // Android (and others using native config) – no options
+    await Firebase.initializeApp();
   }
 
   runApp(const ShareEatApp());

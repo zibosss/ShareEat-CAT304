@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "903892114230",
+    "firebase_url": "https://shareeat-d999c-default-rtdb.asia-southeast1.firebasedatabase.app",
     "project_id": "shareeat-d999c",
     "storage_bucket": "shareeat-d999c.firebasestorage.app"
   },
@@ -9,7 +10,10 @@
       "client_info": {
         "mobilesdk_app_id": "1:903892114230:android:4d9dfb755cc37896577197",
         "android_client_info": {
-          "package_name": "com.example.shareeat"
+          "package_name": "com.example.shareeat",
+          "certificate_hash": [
+            "F4:19:ED:10:06:A6:AA:9A:5B:AD:20:DF:B7:EC:78:6B:D0:89:EE:8B"
+          ]
         }
       },
       "oauth_client": [],
