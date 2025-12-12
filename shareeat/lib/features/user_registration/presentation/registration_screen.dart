@@ -117,7 +117,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     borderRadius: BorderRadius.circular(30),
                   ),
                   child: DropdownButtonFormField<String>(
-                    value: _selectedGender,
+                    initialValue: _selectedGender,
                     hint: const Text("Select Gender"),
                     decoration: const InputDecoration(border: InputBorder.none),
                     items: ["Male", "Female"]
