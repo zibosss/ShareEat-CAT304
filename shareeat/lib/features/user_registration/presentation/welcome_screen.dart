@@ -94,7 +94,7 @@ class WelcomeScreen extends StatelessWidget {
     required Color textColor,
     required VoidCallback onTap,
   }) {
-    return Container(
+    return SizedBox(
       height: 48,
       width: 120,
       child: ElevatedButton(
