@@ -8,7 +8,7 @@ version: 1.0.0+1
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/images/iconfood.jpg"
+  image_path: "assets/images/iconfood.png"
   min_sdk_android: 21
 environment:
   sdk: ^3.9.2
