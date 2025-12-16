@@ -1,5 +1,7 @@
 // lib/features/user_registration/data/user_repository.dart
 
+// ignore_for_file: avoid_print
+
 import 'dart:typed_data';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -126,7 +128,7 @@ class UserRepository {
 
       return url;
     } catch (e) {
-      print("🔥 ERROR uploading image: $e");
+      print("ERROR uploading image: $e");
       rethrow;
     }
   }

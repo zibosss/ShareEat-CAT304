@@ -1,5 +1,7 @@
 // lib/features/user_registration/presentation/login_screen.dart
 
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import '../data/user_repository.dart';
 
@@ -203,8 +205,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   if (!mounted) return;
 
+                  
                   Navigator.pop(context);
 
+                  
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text("Password reset email sent to $email")),
                   );

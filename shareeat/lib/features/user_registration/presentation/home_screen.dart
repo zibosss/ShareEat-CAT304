@@ -5,6 +5,10 @@ import 'profile_screen.dart';
 import '../data/user_model.dart';
 import '../data/user_repository.dart';
 
+// ✅ FIX THESE PATHS to match your real folder:
+import '../../food_listing/presentation/food_list_screen.dart';
+import '../../food_listing/presentation/add_food_screen.dart';
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -18,6 +22,9 @@ class _HomeScreenState extends State<HomeScreen> {
   final UserRepository _userRepo = UserRepository();
   AppUser? _currentUser;
   bool _isLoadingUser = true;
+
+  final GlobalKey<FoodListScreenState> _foodListKey =
+      GlobalKey<FoodListScreenState>();
 
   @override
   void initState() {
@@ -33,22 +40,32 @@ class _HomeScreenState extends State<HomeScreen> {
         _currentUser = user;
         _isLoadingUser = false;
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() => _isLoadingUser = false);
     }
   }
 
-  // LOGOUT CONFIRMATION
+  Future<void> _navigateToAddFood() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AddFoodScreen()),
+    );
+
+    if (result == true) {
+      // ✅ go back to Home tab so user can immediately see the new food
+      setState(() => _selectedIndex = 0);
+      _foodListKey.currentState?.reloadFoods();
+    }
+  }
+
   Future<void> _confirmLogout() async {
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Log out"),
         content: const Text("Are you sure you want to log out?"),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -72,13 +89,17 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // ✅ CENTRAL TAB SWITCH HANDLER
   void _onNavTap(int index) {
+    if (index == 1) {
+      _navigateToAddFood();
+      return;
+    }
+
     setState(() => _selectedIndex = index);
 
-    // Refresh user data when returning to Home
     if (index == 0) {
       _loadCurrentUser();
+      _foodListKey.currentState?.reloadFoods();
     }
   }
 
@@ -86,27 +107,23 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-
-      // ✅ APPBAR ONLY ON HOME TAB
       appBar: _selectedIndex == 0 ? _homeAppBar() : null,
-
-      // ------------------------------ BODY ------------------------------
       body: IndexedStack(
         index: _selectedIndex,
         children: [
-          _homeFeed(),
-          const Center(child: Text("Add Post")),
-          const Center(child: Text("Bookings")),
+          FoodListScreen(
+            key: _foodListKey,
+            username: _currentUser?.username,
+            isLoadingUser: _isLoadingUser,
+          ),
+          const SizedBox.shrink(),
+          const Center(child: Text("Bookings")), // keep placeholder
           const ProfileScreen(),
         ],
       ),
-
-      // ------------------------------ BOTTOM NAV ------------------------------
       bottomNavigationBar: Container(
         height: 65,
-        decoration: const BoxDecoration(
-          color: Color(0xFF7A2B93),
-        ),
+        decoration: const BoxDecoration(color: Color(0xFF7A2B93)),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
@@ -120,28 +137,20 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ------------------------------ HOME APP BAR ------------------------------
   AppBar _homeAppBar() {
     return AppBar(
       backgroundColor: const Color(0xFF7A2B93),
       elevation: 0,
       centerTitle: true,
       automaticallyImplyLeading: false,
-
       leading: IconButton(
         icon: const Icon(Icons.logout, color: Colors.white),
         onPressed: _confirmLogout,
       ),
-
       title: const Text(
         "ShareEat",
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-        ),
+        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
       ),
-
       actions: [
         Padding(
           padding: const EdgeInsets.only(right: 12),
@@ -158,34 +167,19 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     Text(
                       _currentUser?.username ?? "",
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
+                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
                     ),
                     const SizedBox(width: 10),
-
-                    // ✅ FIX: avatar switches to Profile TAB (no Navigator.push)
                     GestureDetector(
                       onTap: () => _onNavTap(3),
                       child: CircleAvatar(
                         radius: 22,
                         backgroundColor: Colors.white24,
-                        backgroundImage:
-                            (_currentUser != null &&
-                                    _currentUser!.profileImageUrl.isNotEmpty)
-                                ? NetworkImage(
-                                    _currentUser!.profileImageUrl,
-                                  )
-                                : null,
-                        child: (_currentUser == null ||
-                                _currentUser!.profileImageUrl.isEmpty)
-                            ? const Icon(
-                                Icons.person,
-                                size: 22,
-                                color: Colors.white,
-                              )
+                        backgroundImage: (_currentUser != null && _currentUser!.profileImageUrl.isNotEmpty)
+                            ? NetworkImage(_currentUser!.profileImageUrl)
+                            : null,
+                        child: (_currentUser == null || _currentUser!.profileImageUrl.isEmpty)
+                            ? const Icon(Icons.person, size: 22, color: Colors.white)
                             : null,
                       ),
                     ),
@@ -196,85 +190,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ------------------------------ HOME FEED ------------------------------
-  Widget _homeFeed() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 15),
-
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: _isLoadingUser
-              ? const SizedBox.shrink()
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Hi, ${_currentUser?.username ?? ""} 👋",
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      "Ready to share food today?",
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.black54,
-                      ),
-                    ),
-                  ],
-                ),
-        ),
-
-        const SizedBox(height: 15),
-
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 15),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(color: Colors.black.withOpacity(0.2)),
-            ),
-            child: const TextField(
-              decoration: InputDecoration(
-                border: InputBorder.none,
-                hintText: "Search...",
-                prefixIcon: Icon(Icons.search),
-              ),
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 30),
-
-        const Expanded(
-          child: Center(
-            child: Text(
-              "No food posts available yet",
-              style: TextStyle(color: Colors.grey),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ------------------------------ NAV BUTTON ------------------------------
   Widget _navButton(IconData icon, int index) {
     final bool isActive = _selectedIndex == index;
-
     return InkWell(
       onTap: () => _onNavTap(index),
-      child: Icon(
-        icon,
-        color: isActive ? Colors.white : Colors.white70,
-        size: 28,
-      ),
+      child: Icon(icon, color: isActive ? Colors.white : Colors.white70, size: 28),
     );
   }
 }
