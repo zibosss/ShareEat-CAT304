@@ -50,7 +50,7 @@ class HomeScreen extends StatelessWidget {
 
           const SizedBox(height: 30),
 
-          // EMPTY STATE (No food posts yet)
+          // EMPTY STATE
           Expanded(
             child: Center(
               child: Column(
