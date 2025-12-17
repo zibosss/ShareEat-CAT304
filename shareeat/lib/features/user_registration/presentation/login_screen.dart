@@ -1,5 +1,3 @@
-// lib/features/user_registration/presentation/login_screen.dart
-
 // ignore_for_file: use_build_context_synchronously
 
 import 'package:flutter/material.dart';
@@ -51,15 +49,27 @@ class _LoginScreenState extends State<LoginScreen> {
                 _inputField(
                   "Email",
                   emailController,
-                  validator: (v) =>
-                      v == null || !v.contains("@") ? "Invalid email" : null,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) {
+                      return "Email is required";
+                    }
+                    if (!v.contains("@")) {
+                      return "Please enter a valid email";
+                    }
+                    return null;
+                  },
                 ),
+
                 _inputField(
                   "Password",
                   passwordController,
                   isPassword: true,
-                  validator: (v) =>
-                      v == null || v.isEmpty ? "Password required" : null,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) {
+                      return "Password is required";
+                    }
+                    return null;
+                  },
                 ),
 
                 const SizedBox(height: 5),
@@ -98,7 +108,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         : const Text(
                             "LOG IN",
                             style: TextStyle(
-                                color: Colors.white, fontSize: 16),
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                   ),
                 ),
@@ -151,24 +164,22 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Login successful")),
-      );
-
       Navigator.pushReplacementNamed(context, '/home');
-
     } catch (e) {
       if (!mounted) return;
 
+      // ✅ Show friendly message from UserRepository
+      final msg = e.toString().replaceAll("Exception: ", "");
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Login failed: $e")),
+        SnackBar(content: Text(msg)),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  /// 🔥 FORGOT PASSWORD DIALOG
+  /// 🔐 FORGOT PASSWORD
   void _showForgotPasswordDialog() {
     final resetEmailController = TextEditingController();
 
@@ -195,7 +206,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 if (email.isEmpty || !email.contains("@")) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                        content: Text("Please enter a valid email address")),
+                      content: Text("Please enter a valid email address"),
+                    ),
                   );
                   return;
                 }
@@ -205,16 +217,20 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   if (!mounted) return;
 
-                  
                   Navigator.pop(context);
 
-                  
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Password reset email sent to $email")),
+                    SnackBar(
+                      content:
+                          Text("Password reset email sent to $email"),
+                    ),
                   );
-                } catch (e) {
+                } catch (_) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Failed to send reset email: $e")),
+                    const SnackBar(
+                      content:
+                          Text("Failed to send reset email. Please try again."),
+                    ),
                   );
                 }
               },
