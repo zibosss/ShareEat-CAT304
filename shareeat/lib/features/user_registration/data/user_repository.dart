@@ -1,22 +1,21 @@
-// lib/features/user_registration/data/user_repository.dart
-
 // ignore_for_file: avoid_print
 
 import 'dart:typed_data';
+
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 import 'user_model.dart';
 
 class UserRepository {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final DatabaseReference _db = FirebaseDatabase.instance.ref();
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
   FirebaseStorage get storage => _storage;
 
-  /// REGISTER NEW USER (AUTH + STORAGE + DATABASE)
+  /// REGISTER NEW USER (AUTH + STORAGE + FIRESTORE)
   Future<AppUser> registerUser({
     required String email,
     required String password,
@@ -27,18 +26,14 @@ class UserRepository {
     required Uint8List profileImageBytes,
   }) async {
     try {
-      print("STEP 1: Creating Firebase Auth user...");
       final userCred = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
       final uid = userCred.user!.uid;
-      print("STEP 2: Auth created successfully: UID = $uid");
 
-      print("STEP 3: Uploading profile image to Firebase Storage...");
       final imageUrl = await uploadProfileImage(uid, profileImageBytes);
-      print("STEP 4: Profile image uploaded successfully: $imageUrl");
 
       final appUser = AppUser(
         uid: uid,
@@ -50,92 +45,184 @@ class UserRepository {
         profileImageUrl: imageUrl,
       );
 
-      print("STEP 5: Saving user data to Realtime Database...");
-      await _db.child("users/$uid").set(appUser.toMap());
-      print("STEP 6: User data saved successfully!");
+      await _db.collection("users").doc(uid).set({
+        ...appUser.toMap(),
+        "createdAt": FieldValue.serverTimestamp(),
+      });
 
       return appUser;
+    } on FirebaseAuthException catch (e) {
+      throw Exception(_mapRegisterError(e));
     } catch (e) {
-      print("🔥 ERROR during registration: $e");
-      rethrow;
+      throw Exception("Registration failed. Please try again.");
     }
   }
 
-  /// LOGIN
+  /// LOGIN (WITH USER-FRIENDLY ERRORS)
   Future<UserCredential> login({
     required String email,
     required String password,
-  }) {
-    print("LOGIN: Attempting login for $email");
-    return _auth.signInWithEmailAndPassword(email: email, password: password);
+  }) async {
+    try {
+      return await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+    } on FirebaseAuthException catch (e) {
+      throw Exception(_mapLoginError(e));
+    } catch (_) {
+      throw Exception("Login failed. Please try again.");
+    }
   }
 
   /// RESET PASSWORD
   Future<void> resetPassword(String email) async {
-    print("Sending password reset email to $email");
     await _auth.sendPasswordResetEmail(email: email);
   }
 
-  /// GET CURRENT USER PROFILE FROM REALTIME DB
+  /// GET CURRENT USER PROFILE FROM FIRESTORE
   Future<AppUser?> getCurrentUserProfile() async {
     final user = _auth.currentUser;
-    if (user == null) {
-      print("No authenticated user found.");
-      return null;
-    }
+    if (user == null) return null;
 
-    print("Fetching user profile for UID: ${user.uid}");
-    final snapshot = await _db.child("users/${user.uid}").get();
+    final doc = await _db.collection("users").doc(user.uid).get();
+    if (!doc.exists) return null;
 
-    if (!snapshot.exists) {
-      print("❌ User profile does NOT exist in Realtime Database.");
-      return null;
-    }
-
-    print("User profile loaded successfully!");
-    final data = Map<String, dynamic>.from(snapshot.value as Map);
-    return AppUser.fromMap(data);
+    return AppUser.fromMap(doc.data()!);
   }
 
   /// UPDATE USER PROFILE
   Future<void> updateUserProfile(AppUser user) async {
-    print("Updating user profile: ${user.uid}");
-    await _db.child("users/${user.uid}").update(user.toMap());
-    print("User profile updated successfully!");
+    await _db.collection("users").doc(user.uid).update(user.toMap());
   }
 
   /// UPDATE PASSWORD
   Future<void> updatePassword(String newPassword) async {
-    print("Updating password...");
     await _auth.currentUser!.updatePassword(newPassword);
-    print("Password updated.");
   }
 
   /// FILE UPLOAD (PROFILE IMAGE)
   Future<String> uploadProfileImage(String uid, Uint8List bytes) async {
-    try {
-      print("Uploading profile image for UID $uid...");
-      final ref = _storage.ref().child("user_profiles/$uid/profile.jpg");
+    final ref = _storage.ref().child("user_profiles/$uid/profile.jpg");
+    final metadata = SettableMetadata(contentType: "image/jpeg");
 
-      // Optional metadata for debugging
-      final metadata = SettableMetadata(contentType: "image/jpeg");
-
-      await ref.putData(bytes, metadata);
-      print("Image upload completed. Fetching Download URL...");
-
-      final url = await ref.getDownloadURL();
-      print("Download URL retrieved: $url");
-
-      return url;
-    } catch (e) {
-      print("ERROR uploading image: $e");
-      rethrow;
-    }
+    await ref.putData(bytes, metadata);
+    return await ref.getDownloadURL();
   }
 
   /// SIGN OUT
   Future<void> signOut() async {
-    print("Signing out...");
+    await _auth.signOut();
+  }
+
+  // ============================
+  // 🔐 FRIENDLY ERROR MAPPERS
+  // ============================
+
+  String _mapLoginError(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'user-not-found':
+        return "Email not registered. Please sign up first.";
+
+      case 'wrong-password':
+        return "Incorrect password. Please try again.";
+
+      case 'invalid-email':
+        return "Invalid email format. Please check and try again.";
+
+      case 'user-disabled':
+        return "This account has been disabled. Please contact support.";
+
+      case 'too-many-requests':
+        return "Too many failed attempts. Please try again later.";
+
+      default:
+        return "Login failed. Please check your credentials.";
+    }
+  }
+
+  String _mapRegisterError(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'email-already-in-use':
+        return "This email is already registered. Please log in.";
+
+      case 'weak-password':
+        return "Password is too weak. Please use at least 6 characters.";
+
+      case 'invalid-email':
+        return "Invalid email address.";
+
+      default:
+        return "Registration failed. Please try again.";
+    }
+  }
+}
+
+// lib/features/user_registration/data/user_repository.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import 'user_model.dart';
+
+class UserRepository {
+  final FirebaseAuth _auth;
+  final FirebaseFirestore _firestore;
+
+  UserRepository({
+    FirebaseAuth? auth,
+    FirebaseFirestore? firestore,
+  })  : _auth = auth ?? FirebaseAuth.instance,
+        _firestore = firestore ?? FirebaseFirestore.instance;
+
+  /// Register new user (Auth + Firestore)
+  Future<AppUser> registerUser({
+    required String email,
+    required String password,
+    required String fullName,
+    required String username,
+    required String contactNumber,
+  }) async {
+    // Auth
+    final userCredential = await _auth.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+    final uid = userCredential.user!.uid;
+
+    // Profile in Firestore
+    final appUser = AppUser(
+      uid: uid,
+      fullName: fullName,
+      username: username,
+      email: email,
+      contactNumber: contactNumber,
+    );
+
+    await _firestore.collection('users').doc(uid).set(appUser.toMap());
+    return appUser;
+  }
+
+  /// Login by email + password
+  Future<UserCredential> login({
+    required String email,
+    required String password,
+  }) {
+    return _auth.signInWithEmailAndPassword(email: email, password: password);
+  }
+
+  Future<AppUser?> getCurrentUserProfile() async {
+    final user = _auth.currentUser;
+    if (user == null) return null;
+    final doc = await _firestore.collection('users').doc(user.uid).get();
+    if (!doc.exists) return null;
+    return AppUser.fromMap(doc.data()!);
+  }
+
+  Future<void> updateUserProfile(AppUser user) async {
+    await _firestore.collection('users').doc(user.uid).update(user.toMap());
+  }
+
+  Future<void> signOut() async {
     await _auth.signOut();
   }
 }
