@@ -23,16 +23,11 @@ class FoodListScreen extends StatefulWidget {
 
 class FoodListScreenState extends State<FoodListScreen> {
   final FoodRepository _foodRepo = FoodRepository();
-
   final TextEditingController _searchController = TextEditingController();
-  String _query = '';
 
+  String _query = '';
   HalalFilter _halalFilter = HalalFilter.all;
   DateSort _dateSort = DateSort.newest;
-
-  Future<void> reloadFoods() async {
-    setState(() {});
-  }
 
   void _searchFoods(String query) {
     setState(() => _query = query.trim().toLowerCase());
@@ -43,9 +38,9 @@ class FoodListScreenState extends State<FoodListScreen> {
       case HalalFilter.all:
         return true;
       case HalalFilter.halal:
-        return f.isHalal == true;
+        return f.isHalal;
       case HalalFilter.nonHalal:
-        return f.isHalal == false;
+        return !f.isHalal;
     }
   }
 
@@ -59,158 +54,18 @@ class FoodListScreenState extends State<FoodListScreen> {
     final filtered =
         foods.where((f) => _matchSearch(f) && _matchHalal(f)).toList();
 
-    filtered.sort((a, b) {
-      return _dateSort == DateSort.newest
-          ? b.createdAt.compareTo(a.createdAt)
-          : a.createdAt.compareTo(b.createdAt);
-    });
+    filtered.sort((a, b) => _dateSort == DateSort.newest
+        ? b.createdAt.compareTo(a.createdAt)
+        : a.createdAt.compareTo(b.createdAt));
 
     return filtered;
   }
 
-  String _halalLabel(HalalFilter v) {
-    switch (v) {
-      case HalalFilter.all:
-        return 'All';
-      case HalalFilter.halal:
-        return 'Halal';
-      case HalalFilter.nonHalal:
-        return 'Non-Halal';
-    }
-  }
+  String _halalLabel(HalalFilter v) =>
+      v == HalalFilter.all ? 'All' : v == HalalFilter.halal ? 'Halal' : 'Non-Halal';
 
-  String _dateLabel(DateSort v) {
-    switch (v) {
-      case DateSort.newest:
-        return 'Newest';
-      case DateSort.oldest:
-        return 'Oldest';
-    }
-  }
-
-  void _openFilterSheet() {
-    HalalFilter tempHalal = _halalFilter;
-    DateSort tempDate = _dateSort;
-
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-      ),
-      builder: (_) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            return Padding(
-              padding: const EdgeInsets.all(18),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Filters',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-
-                  const Text('Halal Status',
-                      style:
-                          TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      ChoiceChip(
-                        label: const Text('All'),
-                        selected: tempHalal == HalalFilter.all,
-                        onSelected: (_) =>
-                            setSheetState(() => tempHalal = HalalFilter.all),
-                      ),
-                      ChoiceChip(
-                        label: const Text('Halal'),
-                        selected: tempHalal == HalalFilter.halal,
-                        onSelected: (_) =>
-                            setSheetState(() => tempHalal = HalalFilter.halal),
-                      ),
-                      ChoiceChip(
-                        label: const Text('Non-Halal'),
-                        selected: tempHalal == HalalFilter.nonHalal,
-                        onSelected: (_) => setSheetState(
-                            () => tempHalal = HalalFilter.nonHalal),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  const Text('Date Posted',
-                      style:
-                          TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      ChoiceChip(
-                        label: const Text('Newest'),
-                        selected: tempDate == DateSort.newest,
-                        onSelected: (_) =>
-                            setSheetState(() => tempDate = DateSort.newest),
-                      ),
-                      ChoiceChip(
-                        label: const Text('Oldest'),
-                        selected: tempDate == DateSort.oldest,
-                        onSelected: (_) =>
-                            setSheetState(() => tempDate = DateSort.oldest),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            // reset
-                            setSheetState(() {
-                              tempHalal = HalalFilter.all;
-                              tempDate = DateSort.newest;
-                            });
-                          },
-                          child: const Text('Reset'),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF7A2B93),
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _halalFilter = tempHalal;
-                              _dateSort = tempDate;
-                            });
-                            Navigator.pop(context);
-                          },
-                          child: const Text(
-                            'Apply',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 10),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
+  String _dateLabel(DateSort v) =>
+      v == DateSort.newest ? 'Newest' : 'Oldest';
 
   @override
   Widget build(BuildContext context) {
@@ -221,6 +76,7 @@ class FoodListScreenState extends State<FoodListScreen> {
       children: [
         const SizedBox(height: 15),
 
+        /// Greeting
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: widget.isLoadingUser
@@ -231,14 +87,13 @@ class FoodListScreenState extends State<FoodListScreen> {
                     Text(
                       "Hi, ${widget.username ?? ""} 👋",
                       style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+                          fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 4),
                     const Text(
                       "Ready to share food today?",
-                      style: TextStyle(fontSize: 14, color: Colors.black54),
+                      style:
+                          TextStyle(fontSize: 14, color: Colors.black54),
                     ),
                   ],
                 ),
@@ -246,128 +101,72 @@ class FoodListScreenState extends State<FoodListScreen> {
 
         const SizedBox(height: 15),
 
-        // Search + Filter icon
+        /// Search bar
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 15),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(30),
-                    border:
-                        Border.all(color: Colors.black.withValues(alpha: 0.2)),
-                  ),
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: _searchFoods,
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      hintText: "Search food...",
-                      prefixIcon: Icon(Icons.search),
-                    ),
-                  ),
-                ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 15),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: Colors.black.withOpacity(0.2)),
+            ),
+            child: TextField(
+              controller: _searchController,
+              onChanged: _searchFoods,
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                hintText: "Search food...",
+                prefixIcon: Icon(Icons.search),
               ),
-              const SizedBox(width: 10),
-              InkWell(
-                onTap: _openFilterSheet,
-                borderRadius: BorderRadius.circular(14),
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF7A2B93).withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: const Color(0xFF7A2B93).withValues(alpha: 0.35),
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.filter_list,
-                    color: Color(0xFF7A2B93),
-                  ),
-                ),
-              )
-            ],
+            ),
           ),
         ),
 
         const SizedBox(height: 10),
 
-        // show active filter summary
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Row(
-            children: [
-              const Icon(Icons.tune, size: 16, color: Colors.black54),
-              const SizedBox(width: 6),
-              Text(
-                chipsText,
-                style: const TextStyle(fontSize: 12, color: Colors.black54),
-              ),
-            ],
+          child: Text(
+            chipsText,
+            style: const TextStyle(fontSize: 12, color: Colors.black54),
           ),
         ),
 
         const SizedBox(height: 10),
 
+        /// Food grid
         Expanded(
           child: StreamBuilder<List<FoodModel>>(
             stream: _foodRepo.watchAvailableFoods(),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
+              if (snapshot.connectionState ==
+                  ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
-              }
-              if (snapshot.hasError) {
-                return Center(child: Text('Error: ${snapshot.error}'));
               }
 
               final foods = snapshot.data ?? [];
               final filtered = _applyFilters(foods);
 
               if (filtered.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.food_bank_outlined,
-                          size: 80, color: Colors.grey[400]),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No matching food items',
-                        style:
-                            TextStyle(fontSize: 18, color: Colors.grey[600]),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Try changing filters or search',
-                        style:
-                            TextStyle(fontSize: 14, color: Colors.grey[500]),
-                      ),
-                    ],
-                  ),
+                return const Center(
+                  child: Text("No food items found"),
                 );
               }
 
-              return RefreshIndicator(
-                onRefresh: reloadFoods,
-                child: GridView.builder(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  gridDelegate:
-                      const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 15,
-                    mainAxisSpacing: 15,
-                    childAspectRatio: 0.75,
-                  ),
-                  itemCount: filtered.length,
-                  itemBuilder: (context, index) {
-                    return _FoodCard(food: filtered[index]);
-                  },
+              return GridView.builder(
+                padding: const EdgeInsets.all(20),
+                gridDelegate:
+                    const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 15,
+                  mainAxisSpacing: 15,
+                  childAspectRatio: 0.75,
                 ),
+                itemCount: filtered.length,
+                itemBuilder: (context, index) {
+                  return _FoodCard(food: filtered[index]);
+                },
               );
             },
           ),
@@ -383,6 +182,9 @@ class FoodListScreenState extends State<FoodListScreen> {
   }
 }
 
+/// ===============================================================
+/// FOOD CARD
+/// ===============================================================
 class _FoodCard extends StatelessWidget {
   final FoodModel food;
 
@@ -392,110 +194,104 @@ class _FoodCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('dd/MM/yyyy');
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
+    return GestureDetector(
+      onTap: () {
+        final foodItem = {
+          'name': food.title,
+          'image': food.imageUrl ?? '',
+          'description': food.description,
+          'quantity': food.quantityAvailable,
+          'posted': dateFormat.format(food.createdAt),
+          'expiry': dateFormat.format(food.expiryDate),
+          'isHalal': food.isHalal,
+        };
+
+        showFoodDetailPopup(context, foodItem);
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: ClipRRect(
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(15),
                   topRight: Radius.circular(15),
                 ),
-              ),
-              child: (food.imageUrl != null && food.imageUrl!.isNotEmpty)
-                  ? ClipRRect(
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(15),
-                        topRight: Radius.circular(15),
-                      ),
-                      child: Image.network(
+                child: food.imageUrl != null && food.imageUrl!.isNotEmpty
+                    ? Image.network(
                         food.imageUrl!,
                         width: double.infinity,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) {
-                          return const Center(
-                            child: Icon(Icons.image,
-                                size: 50, color: Colors.grey),
-                          );
-                        },
-                      ),
-                    )
-                  : const Center(
-                      child: Icon(Icons.image, size: 50, color: Colors.grey),
-                    ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  food.title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Posted: ${dateFormat.format(food.createdAt)}',
-                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                ),
-                Text(
-                  'Expiry: ${dateFormat.format(food.expiryDate)}',
-                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Qty: ${food.quantityAvailable}',
-                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                      ),
-                    ),
-                    if (food.isHalal)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.green[50],
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.green),
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.image,
+                          size: 50,
+                          color: Colors.grey,
                         ),
-                        child: const Text(
-                          'Halal',
-                          style: TextStyle(
-                            fontSize: 9,
-                            color: Colors.green,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ],
+                      )
+                    : const Icon(Icons.image,
+                        size: 50, color: Colors.grey),
+              ),
             ),
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                food.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
+}
+
+/// ===============================================================
+/// FOOD DETAIL POPUP
+/// ===============================================================
+void showFoodDetailPopup(
+    BuildContext context, Map<String, dynamic> foodItem) {
+  showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: Text(foodItem['name']),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(foodItem['description']),
+          const SizedBox(height: 10),
+          Text('Quantity: ${foodItem['quantity']}'),
+          Text('Expiry: ${foodItem['expiry']}'),
+          if (foodItem['isHalal'])
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text('✔ Halal',
+                  style: TextStyle(color: Colors.green)),
+            ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close'),
+        ),
+      ],
+    ),
+  );
 }
