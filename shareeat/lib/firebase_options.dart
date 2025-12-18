@@ -48,6 +48,8 @@ class DefaultFirebaseOptions {
     authDomain: 'shareeat-d999c.firebaseapp.com',
     storageBucket: 'shareeat-d999c.firebasestorage.app',
     measurementId: 'G-ZES19HNG6S',
+    databaseURL: 'https://shareeat-d999c-default-rtdb.asia-southeast1.firebasedatabase.app',
+
   );
 
   static const FirebaseOptions android = FirebaseOptions(
@@ -56,6 +58,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '903892114230',
     projectId: 'shareeat-d999c',
     storageBucket: 'shareeat-d999c.firebasestorage.app',
+    databaseURL: 'https://shareeat-d999c-default-rtdb.asia-southeast1.firebasedatabase.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
