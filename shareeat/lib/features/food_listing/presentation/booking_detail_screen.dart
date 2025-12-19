@@ -1,11 +1,18 @@
 // TODO Implement this library.
 import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:shareeat/features/food_listing/data/models/models/booking_model.dart';
 
-// TODO: If this import is red, delete it and use "Quick Fix" (Ctrl + .) to import your FoodModel
+// -----------------------------------------------------------------------------
+// IMPORTANT: Fix these imports using "Quick Fix" (Ctrl + .) if they are red.
+// They must point to where you saved these files in your project.
+// -----------------------------------------------------------------------------
 import '../data/models/food_model.dart';
+import '../data/models/booking_model.dart' hide BookingModel;      // Created in Step 1
+import '../data/models/booking_repository.dart';         // Created in Step 2
 
 class BookingDetailScreen extends StatefulWidget {
   final FoodModel food;
@@ -274,7 +281,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           ),
 
           // ---------------------------------------------------------
-          // 3. STICKY BOTTOM BUTTON
+          // 3. STICKY BOTTOM BUTTON (Action Logic)
           // ---------------------------------------------------------
           Positioned(
             bottom: 0,
@@ -295,14 +302,62 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               child: SafeArea(
                 top: false,
                 child: ElevatedButton(
-                  onPressed: () {
-                    // TODO: This is where we will add the "Claim Food" logic in the next step
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Request functionality coming next!"),
-                        backgroundColor: Color(0xFF7A2B93),
-                      ),
+                  onPressed: () async {
+                    // 1. Get Current User
+                    final user = FirebaseAuth.instance.currentUser;
+
+                    // 2. Validation: Must be logged in
+                    if (user == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Please login to request food"), backgroundColor: Colors.red),
+                      );
+                      return;
+                    }
+
+                    // 3. Validation: Cannot request own food
+                    if (user.uid == widget.food.ownerId) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("You cannot request your own food"), backgroundColor: Colors.red),
+                      );
+                      return;
+                    }
+
+                    // 4. Create Booking Object
+                    final newBooking = BookingModel(
+                      id: '', // Firestore will generate this automatically
+                      foodId: widget.food.id,
+                      foodTitle: widget.food.title,
+                      foodImage: widget.food.imageUrl,
+                      requesterId: user.uid,
+                      ownerId: widget.food.ownerId,
+                      status: 'pending',
+                      createdAt: DateTime.now(),
                     );
+
+                    // 5. Save to Firestore via Repository
+                    final repo = BookingRepository();
+                    
+                    try {
+                      // Show Loading
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Sending request..."), duration: Duration(seconds: 1)),
+                      );
+
+                      await repo.createBooking(newBooking as BookingModel);
+
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("Request sent successfully!"), backgroundColor: Colors.green),
+                        );
+                        Navigator.pop(context); // Return to previous screen
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("Failed to send request: $e"), backgroundColor: Colors.red),
+                        );
+                      }
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF7A2B93),
