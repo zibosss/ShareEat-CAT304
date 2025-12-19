@@ -26,8 +26,8 @@ class FoodListScreenState extends State<FoodListScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   String _query = '';
-  HalalFilter _halalFilter = HalalFilter.all;
-  DateSort _dateSort = DateSort.newest;
+  final HalalFilter _halalFilter = HalalFilter.all;
+  final DateSort _dateSort = DateSort.newest;
 
   void _searchFoods(String query) {
     setState(() => _query = query.trim().toLowerCase());
