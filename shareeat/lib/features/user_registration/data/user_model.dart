@@ -1,3 +1,5 @@
+// lib/features/user_registration/data/app_user.dart
+
 class AppUser {
   final String uid;
   final String fullName;
@@ -17,7 +19,7 @@ class AppUser {
     required this.profileImageUrl,
   });
 
-  /// Convert object → Map for saving into Realtime Database
+  /// Convert AppUser → Map (for Firestore)
   Map<String, dynamic> toMap() => {
         'uid': uid,
         'fullName': fullName,
@@ -28,7 +30,7 @@ class AppUser {
         'profileImageUrl': profileImageUrl,
       };
 
-  /// Convert Map → AppUser object for loading from Realtime Database
+  /// Convert Firestore Map → AppUser
   factory AppUser.fromMap(Map<String, dynamic> map) => AppUser(
         uid: map['uid']?.toString() ?? '',
         fullName: map['fullName']?.toString() ?? '',

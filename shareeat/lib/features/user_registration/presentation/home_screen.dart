@@ -1,115 +1,200 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-class HomeScreen extends StatelessWidget {
+import 'profile_screen.dart';
+import '../data/user_model.dart';
+import '../data/user_repository.dart';
+
+// ✅ FIX THESE PATHS to match your real folder:
+import '../../food_listing/presentation/food_list_screen.dart';
+import '../../food_listing/presentation/add_food_screen.dart';
+
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  int _selectedIndex = 0;
+
+  final UserRepository _userRepo = UserRepository();
+  AppUser? _currentUser;
+  bool _isLoadingUser = true;
+
+  final GlobalKey<FoodListScreenState> _foodListKey =
+      GlobalKey<FoodListScreenState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentUser();
+  }
+
+  Future<void> _loadCurrentUser() async {
+    try {
+      final user = await _userRepo.getCurrentUserProfile();
+      if (!mounted) return;
+      setState(() {
+        _currentUser = user;
+        _isLoadingUser = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoadingUser = false);
+    }
+  }
+
+  Future<void> _navigateToAddFood() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AddFoodScreen()),
+    );
+
+    if (result == true) {
+      // ✅ go back to Home tab so user can immediately see the new food
+      setState(() => _selectedIndex = 0);
+      _foodListKey.currentState?.reloadFoods();
+    }
+  }
+
+  Future<void> _confirmLogout() async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Log out"),
+        content: const Text("Are you sure you want to log out?"),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color.fromARGB(255, 209, 202, 211),
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Log out"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await FirebaseAuth.instance.signOut();
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, "/login");
+    }
+  }
+
+  void _onNavTap(int index) {
+    if (index == 1) {
+      _navigateToAddFood();
+      return;
+    }
+
+    setState(() => _selectedIndex = index);
+
+    if (index == 0) {
+      _loadCurrentUser();
+      _foodListKey.currentState?.reloadFoods();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-
-      // ------------------------------ HEADER ------------------------------
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF7A2B93),
-        elevation: 0,
-        centerTitle: true,
-        title: const Text(
-          "YOUR FOOD DONATION PLATFORM",
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-
-      // ------------------------------ BODY ------------------------------
-      body: Column(
+      appBar: _selectedIndex == 0 ? _homeAppBar() : null,
+      body: IndexedStack(
+        index: _selectedIndex,
         children: [
-          const SizedBox(height: 15),
-
-          // SEARCH BAR
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 15),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: Colors.black.withOpacity(0.2)),
-              ),
-              child: const TextField(
-                decoration: InputDecoration(
-                  border: InputBorder.none,
-                  hintText: "Search...",
-                  prefixIcon: Icon(Icons.search),
-                ),
-              ),
-            ),
+          FoodListScreen(
+            key: _foodListKey,
+            username: _currentUser?.username,
+            isLoadingUser: _isLoadingUser,
           ),
-
-          const SizedBox(height: 30),
-
-          // EMPTY STATE
-          Expanded(
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Icon(
-                    Icons.fastfood_outlined,
-                    size: 55,
-                    color: Colors.grey,
-                  ),
-                  SizedBox(height: 15),
-                  Text(
-                    "No food posts available yet",
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.black54,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  SizedBox(height: 5),
-                  Text(
-                    "Users will see food items here once they upload.",
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          const SizedBox.shrink(),
+          const Center(child: Text("Bookings")), // keep placeholder
+          const ProfileScreen(),
         ],
       ),
-
-      // ------------------------------ BOTTOM NAV ------------------------------
       bottomNavigationBar: Container(
         height: 65,
-        decoration: const BoxDecoration(
-          color: Color(0xFF7A2B93),
-        ),
+        decoration: const BoxDecoration(color: Color(0xFF7A2B93)),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _navButton(Icons.home, true),
-            _navButton(Icons.add_circle_outline, false),
-            _navButton(Icons.book_online, false),
-            _navButton(Icons.person, false),
+            _navButton(Icons.home, 0),
+            _navButton(Icons.add_circle_outline, 1),
+            _navButton(Icons.book_online, 2),
+            _navButton(Icons.person, 3),
           ],
         ),
       ),
     );
   }
 
-  // bottom nav button
-  Widget _navButton(IconData icon, bool active) {
-    return Icon(
-      icon,
-      color: active ? Colors.white : Colors.white70,
-      size: 28,
+  AppBar _homeAppBar() {
+    return AppBar(
+      backgroundColor: const Color(0xFF7A2B93),
+      elevation: 0,
+      centerTitle: true,
+      automaticallyImplyLeading: false,
+      leading: IconButton(
+        icon: const Icon(Icons.logout, color: Colors.white),
+        onPressed: _confirmLogout,
+      ),
+      title: const Text(
+        "ShareEat",
+        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+      ),
+      actions: [
+        Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: _isLoadingUser
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : Row(
+                  children: [
+                    Text(
+                      _currentUser?.username ?? "",
+                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(width: 10),
+                    GestureDetector(
+                      onTap: () => _onNavTap(3),
+                      child: CircleAvatar(
+                        radius: 22,
+                        backgroundColor: Colors.white24,
+                        backgroundImage: (_currentUser != null && _currentUser!.profileImageUrl.isNotEmpty)
+                            ? NetworkImage(_currentUser!.profileImageUrl)
+                            : null,
+                        child: (_currentUser == null || _currentUser!.profileImageUrl.isEmpty)
+                            ? const Icon(Icons.person, size: 22, color: Colors.white)
+                            : null,
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _navButton(IconData icon, int index) {
+    final bool isActive = _selectedIndex == index;
+    return InkWell(
+      onTap: () => _onNavTap(index),
+      child: Icon(icon, color: isActive ? Colors.white : Colors.white70, size: 28),
     );
   }
 }
