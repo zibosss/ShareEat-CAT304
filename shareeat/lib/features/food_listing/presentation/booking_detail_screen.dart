@@ -343,7 +343,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                         const SnackBar(content: Text("Sending request..."), duration: Duration(seconds: 1)),
                       );
 
-                      await repo.createBooking(newBooking as BookingModel);
+                      await repo.createBooking(newBooking);
 
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
