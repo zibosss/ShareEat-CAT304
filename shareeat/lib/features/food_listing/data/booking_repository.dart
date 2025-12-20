@@ -1,6 +1,7 @@
 // TODO Implement this library.
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'data/models/booking_model.dart';
+import 'package:shareeat/features/food_listing/data/data/models/booking_model.dart';
+
 
 class BookingRepository {
   final FirebaseFirestore _db = FirebaseFirestore.instance;

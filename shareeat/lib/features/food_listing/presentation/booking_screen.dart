@@ -1,10 +1,11 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:shareeat/features/food_listing/data/data/models/booking_model.dart';
 
 // IMPORTANT: Fix these imports to match your folder structure
 import '../data/booking_repository.dart';
-import '../data/models/booking_model.dart';
+
 
 class BookingScreen extends StatefulWidget {
   const BookingScreen({super.key});
