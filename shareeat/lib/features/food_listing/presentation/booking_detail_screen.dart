@@ -3,12 +3,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
-import 'package:shareeat/features/food_listing/data/models/booking_repository.dart';
 
-// Correct imports
+// ✅ CORRECTED IMPORTS (Standardized to use package path)
+import 'package:shareeat/features/food_listing/data/booking_repository.dart';
+import 'package:shareeat/features/food_listing/data/data/models/booking_model.dart';
 import 'package:shareeat/features/food_listing/data/models/food_model.dart';
 
-import 'package:shareeat/features/food_listing/data/data/models/booking_model.dart';
 
 class BookingDetailScreen extends StatefulWidget {
   final FoodModel food;
@@ -33,15 +33,16 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   }
 
   void _setMarker() {
-    _markers.add(
-      Marker(
-        markerId: MarkerId(widget.food.id),
-        position: LatLng(widget.food.latitude, widget.food.longitude),
-        infoWindow: InfoWindow(title: widget.food.title),
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
-      ),
-    );
-    setState(() {});
+    setState(() {
+      _markers.add(
+        Marker(
+          markerId: MarkerId(widget.food.id),
+          position: LatLng(widget.food.latitude, widget.food.longitude),
+          infoWindow: InfoWindow(title: widget.food.title),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
+        ),
+      );
+    });
   }
 
   @override
@@ -55,6 +56,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         children: [
           CustomScrollView(
             slivers: [
+              // 1. APP BAR IMAGE
               SliverAppBar(
                 expandedHeight: 250,
                 pinned: true,
@@ -65,6 +67,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                       ? Image.network(
                           widget.food.imageUrl!,
                           fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(color: Colors.grey[300], child: const Icon(Icons.broken_image)),
                         )
                       : Container(
                           color: Colors.grey[300],
@@ -84,12 +88,14 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 ),
               ),
 
+              // 2. CONTENT DETAILS
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Halal Tag & Expiry
                       Row(
                         children: [
                           Container(
@@ -120,6 +126,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
 
                       const SizedBox(height: 15),
 
+                      // Title & Quantity
                       Row(
                         children: [
                           Expanded(
@@ -162,20 +169,24 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                       const Text("Pickup Location", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 10),
 
+                      // Google Map
                       SizedBox(
                         height: 200,
-                        child: GoogleMap(
-                          initialCameraPosition: CameraPosition(
-                            target: LatLng(widget.food.latitude, widget.food.longitude),
-                            zoom: 15,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(15),
+                          child: GoogleMap(
+                            initialCameraPosition: CameraPosition(
+                              target: LatLng(widget.food.latitude, widget.food.longitude),
+                              zoom: 15,
+                            ),
+                            markers: _markers,
+                            zoomControlsEnabled: false,
+                            onMapCreated: (c) => _controller.complete(c),
                           ),
-                          markers: _markers,
-                          zoomControlsEnabled: false,
-                          onMapCreated: (c) => _controller.complete(c),
                         ),
                       ),
 
-                      const SizedBox(height: 120),
+                      const SizedBox(height: 120), // Bottom padding for button
                     ],
                   ),
                 ),
@@ -183,6 +194,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
             ],
           ),
 
+          // 3. REQUEST BUTTON
           Positioned(
             bottom: 0,
             left: 0,
@@ -199,6 +211,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                   onPressed: () async {
                     final user = FirebaseAuth.instance.currentUser;
 
+                    // Validation 1: User Logged In
                     if (user == null) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text("Please login"), backgroundColor: Colors.red),
@@ -206,6 +219,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                       return;
                     }
 
+                    // Validation 2: Own Food
                     if (user.uid == widget.food.ownerId) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text("You cannot request your own food"), backgroundColor: Colors.red),
@@ -213,7 +227,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                       return;
                     }
 
-                    // Unique QR string
+                    // Generate Unique QR string
                     final String uniqueQrString =
                         "SE-${user.uid.substring(0, 5)}-${DateTime.now().millisecondsSinceEpoch}";
 
@@ -232,10 +246,34 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                     final repo = BookingRepository();
 
                     try {
-                      await repo.createBooking(newBooking); // FIXED (no cast)
-                      if (context.mounted) Navigator.pop(context);
+                      // Show Processing
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("Sending request..."),
+                          duration: Duration(milliseconds: 500),
+                        ),
+                      );
+
+                      // Save to Database
+                      await repo.createBooking(newBooking);
+
+                      if (context.mounted) {
+                        // ✅ SUCCESS: Show Green Message
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("Request sent successfully!"),
+                            backgroundColor: Colors.green,
+                            behavior: SnackBarBehavior.floating,
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                        
+                        // Close Screen
+                        Navigator.pop(context);
+                      }
                     } catch (e) {
                       if (context.mounted) {
+                        // ❌ ERROR: Show Red Message
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
                         );
