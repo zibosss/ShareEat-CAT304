@@ -42,7 +42,7 @@ class BookingModel {
       id: doc.id,
       foodId: data['foodId'] ?? '',
       foodTitle: data['foodTitle'] ?? '',
-      foodImage: data['foodImage'],
+      foodImage: data['foodImage'] as String?,
       requesterId: data['requesterId'] ?? '',
       ownerId: data['ownerId'] ?? '',
       status: data['status'] ?? 'pending',
