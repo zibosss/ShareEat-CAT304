@@ -1,4 +1,3 @@
-// TODO Implement this library.
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class BookingModel {
@@ -8,7 +7,8 @@ class BookingModel {
   final String? foodImage;
   final String requesterId;
   final String ownerId;
-  final String status; // e.g., 'pending', 'accepted', 'rejected'
+  final String status;
+  final String qrCodeData; // <--- NEW FIELD
   final DateTime createdAt;
 
   BookingModel({
@@ -19,6 +19,7 @@ class BookingModel {
     required this.requesterId,
     required this.ownerId,
     required this.status,
+    required this.qrCodeData, // <--- NEW FIELD
     required this.createdAt,
   });
 
@@ -30,6 +31,7 @@ class BookingModel {
       'requesterId': requesterId,
       'ownerId': ownerId,
       'status': status,
+      'qrCodeData': qrCodeData, // <--- SAVE TO FIRESTORE
       'createdAt': FieldValue.serverTimestamp(),
     };
   }
@@ -44,6 +46,7 @@ class BookingModel {
       requesterId: data['requesterId'] ?? '',
       ownerId: data['ownerId'] ?? '',
       status: data['status'] ?? 'pending',
+      qrCodeData: data['qrCodeData'] ?? '', // <--- READ FROM FIRESTORE
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }

@@ -19,7 +19,7 @@ class BookingModel {
     required this.requesterId,
     required this.ownerId,
     required this.status,
-    required this.createdAt,
+    required this.createdAt, required String qrCodeData,
   });
 
   Map<String, dynamic> toJson() {
@@ -44,7 +44,9 @@ class BookingModel {
       requesterId: data['requesterId'] ?? '',
       ownerId: data['ownerId'] ?? '',
       status: data['status'] ?? 'pending',
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(), qrCodeData: '',
     );
   }
+
+  String? get qrCodeData => null;
 }
