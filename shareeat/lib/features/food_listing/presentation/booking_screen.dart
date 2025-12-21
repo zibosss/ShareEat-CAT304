@@ -6,8 +6,6 @@ import 'package:shareeat/features/food_listing/data/booking_repository.dart';
 import 'package:shareeat/features/food_listing/data/data/models/booking_model.dart';
 
 // ✅ CHECK IMPORTS: Adjust to match your folder structure
-import '../../food_listing/data/booking_repository.dart';
-import '../../food_listing/data/models/booking_model.dart' hide BookingModel;
 
 class BookingScreen extends StatefulWidget {
   const BookingScreen({super.key});
@@ -77,45 +75,53 @@ class _BookingCard extends StatelessWidget {
   final BookingModel booking;
   const _BookingCard({required this.booking});
 
-  // Function to show QR Code Popup
   void _showQRCode(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        var data = null;
-        return Dialog(
+  showDialog(
+    context: context,
+    builder: (context) {
+      return Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text("Verification Code", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const Text(
+                "Verification Code",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 20),
-              
-              // ✅ QR IMAGE GENERATION
+
+              /// ✅ Use the correct QR data from your model
               QrImageView(
-                data: data, // Using the unique code from database
+                data: booking.qrCodeData,
                 version: QrVersions.auto,
                 size: 200.0,
                 backgroundColor: Colors.white,
               ),
-              
+
               const SizedBox(height: 20),
-              Text("Show this to the donor", style: TextStyle(color: Colors.grey[600])),
+              Text(
+                "Show this QR to the donor",
+                style: TextStyle(color: Colors.grey[600]),
+              ),
               const SizedBox(height: 20),
+
               ElevatedButton(
                 onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7A2B93)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF7A2B93),
+                ),
                 child: const Text("Close", style: TextStyle(color: Colors.white)),
-              )
+              ),
             ],
           ),
         ),
       );
-      },
-    );
-  }
+    },
+  );
+}
+
 
   @override
   Widget build(BuildContext context) {
