@@ -7,7 +7,7 @@ import 'package:shareeat/features/food_listing/data/data/models/booking_model.da
 
 // ✅ CHECK IMPORTS: Fix these paths if they show red lines
 import '../data/models/food_model.dart';
-import '../data/models/booking_model.dart' hide BookingModel; 
+import 'package:shareeat/features/food_listing/data/models/booking_model.dart' hide BookingModel;
 import 'package:shareeat/features/food_listing/data/booking_repository.dart';
 
 class BookingDetailScreen extends StatefulWidget {
@@ -264,7 +264,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                         const SnackBar(content: Text("Processing Request..."), duration: Duration(seconds: 1)),
                       );
 
-                      await repo.createBooking(newBooking as BookingModel);
+                      await repo.createBooking(newBooking);
+;
 
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(

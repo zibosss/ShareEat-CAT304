@@ -46,7 +46,8 @@ class BookingModel {
       requesterId: data['requesterId'] ?? '',
       ownerId: data['ownerId'] ?? '',
       status: data['status'] ?? 'pending',
-      qrCodeData: data['qrCodeData'] ?? '', // <--- READ FROM FIRESTORE
+     qrCodeData: (data['qrCodeData'] as String?) ?? 'NO_QR_DATA',
+ // <--- READ FROM FIRESTORE
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
