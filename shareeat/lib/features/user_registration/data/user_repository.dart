@@ -91,6 +91,15 @@ class UserRepository {
     return AppUser.fromMap(doc.data()!);
   }
 
+  /// GET USER PROFILE BY UID (FOR DONOR INFO)
+Future<AppUser?> getUserById(String uid) async {
+  final doc = await _db.collection("users").doc(uid).get();
+  if (!doc.exists) return null;
+
+  return AppUser.fromMap(doc.data()!);
+}
+
+
   /// UPDATE USER PROFILE
   Future<void> updateUserProfile(AppUser user) async {
     await _db.collection("users").doc(user.uid).update(user.toMap());

@@ -4,11 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
 
-// ✅ CORRECTED IMPORTS (Standardized to use package path)
+// Food & Booking
 import 'package:shareeat/features/food_listing/data/booking_repository.dart';
 import 'package:shareeat/features/food_listing/data/data/models/booking_model.dart';
 import 'package:shareeat/features/food_listing/data/models/food_model.dart';
 
+// User module (existing)
+import 'package:shareeat/features/user_registration/data/user_model.dart';
+import 'package:shareeat/features/user_registration/data/user_repository.dart';
 
 class BookingDetailScreen extends StatefulWidget {
   final FoodModel food;
@@ -26,23 +29,33 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   final Completer<GoogleMapController> _controller = Completer();
   final Set<Marker> _markers = {};
 
+  // Donor state
+  final UserRepository _userRepo = UserRepository();
+  AppUser? donor;
+  bool isLoadingDonor = true;
+
   @override
   void initState() {
     super.initState();
     _setMarker();
+    _loadDonor();
   }
 
   void _setMarker() {
-    setState(() {
-      _markers.add(
-        Marker(
-          markerId: MarkerId(widget.food.id),
-          position: LatLng(widget.food.latitude, widget.food.longitude),
-          infoWindow: InfoWindow(title: widget.food.title),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
-        ),
-      );
-    });
+    _markers.add(
+      Marker(
+        markerId: MarkerId(widget.food.id),
+        position: LatLng(widget.food.latitude, widget.food.longitude),
+        infoWindow: InfoWindow(title: widget.food.title),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
+      ),
+    );
+  }
+
+  Future<void> _loadDonor() async {
+    donor = await _userRepo.getUserById(widget.food.ownerId);
+    if (!mounted) return;
+    setState(() => isLoadingDonor = false);
   }
 
   @override
@@ -56,7 +69,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         children: [
           CustomScrollView(
             slivers: [
-              // 1. APP BAR IMAGE
+              // APP BAR IMAGE
               SliverAppBar(
                 expandedHeight: 250,
                 pinned: true,
@@ -67,89 +80,53 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                       ? Image.network(
                           widget.food.imageUrl!,
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              Container(color: Colors.grey[300], child: const Icon(Icons.broken_image)),
+                          errorBuilder: (_, __, ___) =>
+                              Container(
+                                color: Colors.grey[300],
+                                child: const Icon(Icons.broken_image),
+                              ),
                         )
                       : Container(
                           color: Colors.grey[300],
                           child: const Icon(Icons.fastfood, size: 80),
                         ),
                 ),
-                leading: Container(
-                  margin: const EdgeInsets.all(8),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                  child: IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.black),
-                    onPressed: () => Navigator.pop(context),
-                  ),
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
                 ),
               ),
 
-              // 2. CONTENT DETAILS
+              // CONTENT
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Halal Tag & Expiry
+                      // Halal & Expiry
                       Row(
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: widget.food.isHalal ? Colors.green[50] : Colors.orange[50],
-                              borderRadius: BorderRadius.circular(5),
-                              border: Border.all(
-                                color: widget.food.isHalal ? Colors.green : Colors.orange,
-                              ),
-                            ),
-                            child: Text(
-                              widget.food.isHalal ? 'Halal' : 'Non-Halal',
-                              style: TextStyle(
-                                color: widget.food.isHalal ? Colors.green[700] : Colors.orange[800],
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
-                            ),
+                          Chip(
+                            label: Text(widget.food.isHalal ? 'Halal' : 'Non-Halal'),
+                            backgroundColor:
+                                widget.food.isHalal ? Colors.green[50] : Colors.orange[50],
                           ),
                           const Spacer(),
                           Text(
                             "Expires: ${expiryFormat.format(widget.food.expiryDate)}",
                             style: const TextStyle(color: Colors.red),
-                          )
-                        ],
-                      ),
-
-                      const SizedBox(height: 15),
-
-                      // Title & Quantity
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              widget.food.title,
-                              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-                            ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF7A2B93),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              "${widget.food.quantityAvailable}",
-                              style: const TextStyle(fontSize: 20, color: Colors.white),
-                            ),
-                          )
                         ],
                       ),
 
                       const SizedBox(height: 10),
+
+                      // Title
+                      Text(
+                        widget.food.title,
+                        style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+                      ),
 
                       Text(
                         "Posted on ${dateFormat.format(widget.food.createdAt)}",
@@ -158,18 +135,70 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
 
                       const SizedBox(height: 20),
                       const Divider(),
-                      const SizedBox(height: 20),
 
-                      const Text("Description", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 10),
+                      // Description
+                      const Text(
+                        "Description",
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
                       Text(widget.food.description),
 
                       const SizedBox(height: 20),
+                      const Divider(),
 
-                      const Text("Pickup Location", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      // DONOR INFO
+                      const Text(
+                        "Donor Information",
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
                       const SizedBox(height: 10),
 
-                      // Google Map
+                      if (isLoadingDonor)
+                        const Center(child: CircularProgressIndicator())
+                      else if (donor != null)
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.person, size: 18),
+                                const SizedBox(width: 8),
+                                Text(
+                                  donor!.username,
+                                  style: const TextStyle(fontSize: 16),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                const Icon(Icons.phone, size: 18),
+                                const SizedBox(width: 8),
+                                Text(
+                                  donor!.contactNumber,
+                                  style: const TextStyle(fontSize: 16),
+                                ),
+                              ],
+                            ),
+                          ],
+                        )
+                      else
+                        const Text(
+                          "Donor information not available",
+                          style: TextStyle(color: Colors.grey),
+                        ),
+
+                      const SizedBox(height: 20),
+                      const Divider(),
+
+                      // Location
+                      const Text(
+                        "Pickup Location",
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 10),
+
                       SizedBox(
                         height: 200,
                         child: ClipRRect(
@@ -186,7 +215,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                         ),
                       ),
 
-                      const SizedBox(height: 120), // Bottom padding for button
+                      const SizedBox(height: 120),
                     ],
                   ),
                 ),
@@ -194,100 +223,40 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
             ],
           ),
 
-          // 3. REQUEST BUTTON
+          // REQUEST BUTTON
           Positioned(
             bottom: 0,
             left: 0,
             right: 0,
             child: Container(
               padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)],
-              ),
-              child: SafeArea(
-                top: false,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    final user = FirebaseAuth.instance.currentUser;
-
-                    // Validation 1: User Logged In
-                    if (user == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Please login"), backgroundColor: Colors.red),
-                      );
-                      return;
-                    }
-
-                    // Validation 2: Own Food
-                    if (user.uid == widget.food.ownerId) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("You cannot request your own food"), backgroundColor: Colors.red),
-                      );
-                      return;
-                    }
-
-                    // Generate Unique QR string
-                    final String uniqueQrString =
-                        "SE-${user.uid.substring(0, 5)}-${DateTime.now().millisecondsSinceEpoch}";
-
-                    final newBooking = BookingModel(
-                      id: '',
-                      foodId: widget.food.id,
-                      foodTitle: widget.food.title,
-                      foodImage: widget.food.imageUrl,
-                      requesterId: user.uid,
-                      ownerId: widget.food.ownerId,
-                      status: 'pending',
-                      qrCodeData: uniqueQrString,
-                      createdAt: DateTime.now(),
-                    );
-
-                    final repo = BookingRepository();
-
-                    try {
-                      // Show Processing
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("Sending request..."),
-                          duration: Duration(milliseconds: 500),
-                        ),
-                      );
-
-                      // Save to Database
-                      await repo.createBooking(newBooking);
-
-                      if (context.mounted) {
-                        // ✅ SUCCESS: Show Green Message
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text("Request sent successfully!"),
-                            backgroundColor: Colors.green,
-                            behavior: SnackBarBehavior.floating,
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                        
-                        // Close Screen
-                        Navigator.pop(context);
-                      }
-                    } catch (e) {
-                      if (context.mounted) {
-                        // ❌ ERROR: Show Red Message
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
-                        );
-                      }
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF7A2B93),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: const Text("Request Food",
-                      style: TextStyle(fontSize: 18, color: Colors.white)),
+              color: Colors.white,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF7A2B93),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
+                child: const Text("Request Food", style: TextStyle(fontSize: 18)),
+                onPressed: () async {
+                  final user = FirebaseAuth.instance.currentUser;
+                  if (user == null || user.uid == widget.food.ownerId) return;
+
+                  final booking = BookingModel(
+                    id: '',
+                    foodId: widget.food.id,
+                    foodTitle: widget.food.title,
+                    foodImage: widget.food.imageUrl,
+                    requesterId: user.uid,
+                    ownerId: widget.food.ownerId,
+                    status: 'pending',
+                    qrCodeData:
+                        "SE-${user.uid.substring(0, 5)}-${DateTime.now().millisecondsSinceEpoch}",
+                    createdAt: DateTime.now(),
+                  );
+
+                  await BookingRepository().createBooking(booking);
+                  if (mounted) Navigator.pop(context);
+                },
               ),
             ),
           ),

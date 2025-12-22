@@ -1,208 +1,257 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:qr_flutter/qr_flutter.dart'; // ✅ Make sure to run: flutter pub add qr_flutter
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+
 import 'package:shareeat/features/food_listing/data/booking_repository.dart';
 import 'package:shareeat/features/food_listing/data/data/models/booking_model.dart';
 
-// ✅ CHECK IMPORTS: Adjust to match your folder structure
-
-class BookingScreen extends StatefulWidget {
+class BookingScreen extends StatelessWidget {
   const BookingScreen({super.key});
 
   @override
-  State<BookingScreen> createState() => _BookingScreenState();
-}
-
-class _BookingScreenState extends State<BookingScreen> {
-  final BookingRepository _repo = BookingRepository();
-  final String? currentUserId = FirebaseAuth.instance.currentUser?.uid;
-
-  @override
   Widget build(BuildContext context) {
-    if (currentUserId == null) {
-      return const Center(child: Text("Please log in to see your requests"));
-    }
-
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text('My Requests', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-      ),
-      body: StreamBuilder<List<BookingModel>>(
-        stream: _repo.watchMyBookings(currentUserId!),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
-
-          final bookings = snapshot.data ?? [];
-
-          if (bookings.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.qr_code_2, size: 80, color: Colors.grey[300]),
-                  const SizedBox(height: 16),
-                  Text("No requests yet", style: TextStyle(color: Colors.grey[600], fontSize: 16)),
-                ],
-              ),
-            );
-          }
-
-          return ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: bookings.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              return _BookingCard(booking: bookings[index]);
-            },
-          );
-        },
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text("My Bookings"),
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: "My Requests"),
+              Tab(text: "My Donations"),
+            ],
+          ),
+        ),
+        body: const TabBarView(
+          children: [
+            _MyRequestsTab(),
+            _MyDonationsTab(),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _BookingCard extends StatelessWidget {
-  final BookingModel booking;
-  const _BookingCard({required this.booking});
+/* =========================================================
+   MY REQUESTS (REQUESTER VIEW)
+   ========================================================= */
 
-  void _showQRCode(BuildContext context) {
-  showDialog(
-    context: context,
-    builder: (context) {
-      return Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                "Verification Code",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 20),
+class _MyRequestsTab extends StatelessWidget {
+  const _MyRequestsTab();
 
-              /// ✅ Use the correct QR data from your model
-              QrImageView(
-                data: booking.qrCodeData,
-                version: QrVersions.auto,
-                size: 200.0,
-                backgroundColor: Colors.white,
-              ),
-
-              const SizedBox(height: 20),
-              Text(
-                "Show this QR to the donor",
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-              const SizedBox(height: 20),
-
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF7A2B93),
-                ),
-                child: const Text("Close", style: TextStyle(color: Colors.white)),
-              ),
-            ],
-          ),
+  void _showQRCode(BuildContext context, String qrData) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Your QR Code"),
+        content: QrImageView(
+          data: qrData,
+          size: 200,
         ),
-      );
-    },
-  );
-}
-
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final dateStr = DateFormat('dd MMM, hh:mm a').format(booking.createdAt);
-    
-    // Determine Color
-    Color statusColor;
-    switch(booking.status.toLowerCase()) {
-      case 'accepted': statusColor = Colors.green; break;
-      case 'rejected': statusColor = Colors.red; break;
-      default: statusColor = Colors.orange;
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) {
+      return const Center(child: Text("Please log in"));
     }
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 2))
-        ],
-      ),
-      child: Column(
-        children: [
-          // Top Row: Image & Info
-          Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: booking.foodImage != null && booking.foodImage!.isNotEmpty
-                    ? Image.network(booking.foodImage!, width: 70, height: 70, fit: BoxFit.cover)
-                    : Container(width: 70, height: 70, color: Colors.grey[200], child: const Icon(Icons.fastfood, color: Colors.grey)),
+    return StreamBuilder<List<BookingModel>>(
+      stream: BookingRepository().watchMyBookings(userId),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final bookings = snapshot.data!;
+        if (bookings.isEmpty) {
+          return const Center(child: Text("No requests yet"));
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: bookings.length,
+          itemBuilder: (context, index) {
+            final booking = bookings[index];
+            final dateStr =
+                DateFormat('dd MMM, hh:mm a').format(booking.createdAt);
+
+            return Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
               ),
-              const SizedBox(width: 15),
-              Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(booking.foodTitle, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(
+                      booking.foodTitle,
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
                     const SizedBox(height: 6),
-                    Text("Requested: $dateStr", style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                    Text(
+                      "Requested: $dateStr",
+                      style: TextStyle(color: Colors.grey[600]),
+                    ),
+
+                    const Divider(height: 20),
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Chip(
+                          label: Text(booking.status.toUpperCase()),
+                        ),
+                        ElevatedButton(
+                          onPressed: () =>
+                              _showQRCode(context, booking.qrCodeData),
+                          child: const Text("View QR"),
+                        ),
+                      ],
+                    )
                   ],
                 ),
               ),
-            ],
-          ),
-          
-          const SizedBox(height: 12),
-          const Divider(),
+            );
+          },
+        );
+      },
+    );
+  }
+}
 
-          // Bottom Row: Status & QR Button
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: statusColor.withOpacity(0.5)),
-                ),
-                child: Text(
-                  booking.status.toUpperCase(),
-                  style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
+/* =========================================================
+   MY DONATIONS (DONOR VIEW)
+   ========================================================= */
+
+class _MyDonationsTab extends StatelessWidget {
+  const _MyDonationsTab();
+
+  @override
+  Widget build(BuildContext context) {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) {
+      return const Center(child: Text("Please log in"));
+    }
+
+    return StreamBuilder<List<BookingModel>>(
+      stream: BookingRepository().watchMyDonations(userId),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final donations = snapshot.data!;
+        if (donations.isEmpty) {
+          return const Center(child: Text("No incoming requests"));
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: donations.length,
+          itemBuilder: (context, index) {
+            final booking = donations[index];
+
+            return Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      booking.foodTitle,
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 6),
+                    Text("Status: ${booking.status.toUpperCase()}"),
+
+                    const SizedBox(height: 12),
+
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.qr_code_scanner),
+                      label: const Text("Scan QR"),
+                      onPressed: booking.status == 'completed'
+                          ? null
+                          : () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      _ScanQrScreen(booking: booking),
+                                ),
+                              );
+                            },
+                    ),
+                  ],
                 ),
               ),
-              
-              // ✅ View QR Button
-              ElevatedButton.icon(
-                onPressed: () => _showQRCode(context),
-                icon: const Icon(Icons.qr_code, size: 16, color: Colors.white),
-                label: const Text("View QR", style: TextStyle(color: Colors.white)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF7A2B93),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                ),
-              )
-            ],
-          )
-        ],
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+/* =========================================================
+   QR SCAN SCREEN – VERIFICATION (FIXED)
+   ========================================================= */
+
+class _ScanQrScreen extends StatefulWidget {
+  final BookingModel booking;
+  const _ScanQrScreen({required this.booking});
+
+  @override
+  State<_ScanQrScreen> createState() => _ScanQrScreenState();
+}
+
+class _ScanQrScreenState extends State<_ScanQrScreen> {
+  bool _isVerified = false; // prevent multiple scans
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Scan QR")),
+      body: MobileScanner(
+        onDetect: (BarcodeCapture capture) async {
+          if (_isVerified) return;
+          if (capture.barcodes.isEmpty) return;
+
+          final Barcode barcode = capture.barcodes.first;
+          final String? scannedCode = barcode.rawValue;
+
+          if (scannedCode == null) return;
+
+          if (scannedCode == widget.booking.qrCodeData) {
+            _isVerified = true;
+
+            await BookingRepository()
+                .markBookingCompleted(widget.booking.id);
+
+            if (!mounted) return;
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text("Pickup verified successfully"),
+                backgroundColor: Colors.green,
+              ),
+            );
+
+            Navigator.pop(context);
+          }
+        },
       ),
     );
   }
