@@ -4,59 +4,64 @@ import 'package:shareeat/features/food_listing/data/data/models/booking_model.da
 class BookingRepository {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  /// ===============================
-  /// CREATE BOOKING (REQUEST FOOD)
-  /// ===============================
+  // ✅ NEW: Create Booking AND Deduct Quantity Safely
   Future<void> createBooking(BookingModel booking) async {
-    await _db.collection('bookings').add(booking.toJson());
+    final foodRef = _db.collection('foods').doc(booking.foodId);
+    final bookingRef = _db.collection('bookings').doc(); // Generate a new ID
+
+    return _db.runTransaction((transaction) async {
+      // 1. Get the current food document
+      final foodSnapshot = await transaction.get(foodRef);
+
+      if (!foodSnapshot.exists) {
+        throw Exception("Food item no longer exists!");
+      }
+
+      // 2. Check current quantity
+      // (Assuming the field in Firebase is 'quantityAvailable')
+      final int currentQty = foodSnapshot.data()?['quantityAvailable'] ?? 0;
+
+      if (currentQty <= 0) {
+        throw Exception("Sorry, this food is now out of stock!");
+      }
+
+      // 3. Deduct Quantity by 1
+      transaction.update(foodRef, {
+        'quantityAvailable': currentQty - 1,
+      });
+
+      // 4. Save the Booking
+      // We manually add the ID if your model needs it, or just save the data
+      transaction.set(bookingRef, booking.toJson());
+    });
   }
 
-  /// =========================================
-  /// REQUESTER VIEW: MY REQUESTS
-  /// =========================================
+  // Watch My Requests
   Stream<List<BookingModel>> watchMyBookings(String userId) {
     return _db
         .collection('bookings')
         .where('requesterId', isEqualTo: userId)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snap) => snap.docs.map(BookingModel.fromDoc).toList());
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => BookingModel.fromDoc(doc)).toList());
   }
 
-  /// =========================================
-  /// DONOR VIEW: MY DONATIONS (INCOMING REQUESTS)
-  /// =========================================
-  Stream<List<BookingModel>> watchMyDonations(String ownerId) {
+  // Watch My Donations
+  Stream<List<BookingModel>> watchMyDonations(String userId) {
     return _db
         .collection('bookings')
-        .where('ownerId', isEqualTo: ownerId)
+        .where('ownerId', isEqualTo: userId)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snap) => snap.docs.map(BookingModel.fromDoc).toList());
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => BookingModel.fromDoc(doc)).toList());
   }
 
-  /// =========================================
-  /// QR VERIFICATION: MARK BOOKING AS COMPLETED
-  /// =========================================
+  // Mark Completed
   Future<void> markBookingCompleted(String bookingId) async {
-    await _db
-        .collection('bookings')
-        .doc(bookingId)
-        .update({
-          'status': 'completed',
-        });
-  }
-
-  /// =========================================
-  /// OPTIONAL: DONOR ACCEPT REQUEST
-  /// (USE IF YOU ADD ACCEPT / REJECT LATER)
-  /// =========================================
-  Future<void> updateBookingStatus(String bookingId, String status) async {
-    await _db
-        .collection('bookings')
-        .doc(bookingId)
-        .update({
-          'status': status,
-        });
+    await _db.collection('bookings').doc(bookingId).update({
+      'status': 'completed',
+    });
   }
 }
