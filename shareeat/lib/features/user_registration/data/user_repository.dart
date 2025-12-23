@@ -47,8 +47,10 @@ class UserRepository {
 
       await _db.collection("users").doc(uid).set({
         ...appUser.toMap(),
+        "role": "user", // default role
         "createdAt": FieldValue.serverTimestamp(),
       });
+
 
       return appUser;
     } on FirebaseAuthException catch (e) {
@@ -90,6 +92,25 @@ class UserRepository {
 
     return AppUser.fromMap(doc.data()!);
   }
+
+    /// GET CURRENT USER ROLE (admin/user)
+  Future<String> getCurrentUserRole() async {
+    final user = _auth.currentUser;
+    if (user == null) return "user";
+
+    final doc = await _db.collection("users").doc(user.uid).get();
+    if (!doc.exists) return "user";
+
+    final data = doc.data() as Map<String, dynamic>;
+    return (data["role"] ?? "user").toString();
+  }
+
+  /// QUICK CHECK
+  Future<bool> isCurrentUserAdmin() async {
+    final role = await getCurrentUserRole();
+    return role.trim().toLowerCase() == "admin";
+  }
+
 
   /// UPDATE USER PROFILE
   Future<void> updateUserProfile(AppUser user) async {

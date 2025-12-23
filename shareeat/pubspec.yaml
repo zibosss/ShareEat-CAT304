@@ -30,6 +30,7 @@ dependencies:
   intl: ^0.19.0
   google_maps_flutter: ^2.5.0
   flutter_launcher_icons: ^0.14.3
+  fl_chart: ^0.69.0
 
 
 dev_dependencies:

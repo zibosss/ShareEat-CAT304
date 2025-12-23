@@ -1,7 +1,12 @@
 // ignore_for_file: use_build_context_synchronously
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../data/user_repository.dart';
+
+// ✅ Add these imports for role-based navigation
+import '../../report/presentation/admin_dashboard.dart';
+import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,6 +22,13 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
 
   final _userRepo = UserRepository();
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -152,32 +164,52 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _onLoginPressed() async {
-    if (!_formKey.currentState!.validate()) return;
+  if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+  setState(() => _isLoading = true);
 
-    try {
-      await _userRepo.login(
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
+  try {
+    // 1️⃣ Login
+    await _userRepo.login(
+      email: emailController.text.trim(),
+      password: passwordController.text.trim(),
+    );
+
+    // 🔍 DEBUG: check which account actually logged in
+    final current = FirebaseAuth.instance.currentUser;
+    debugPrint("LOGGED IN UID = ${current?.uid}");
+    debugPrint("LOGGED IN EMAIL = ${current?.email}");
+
+    // 🔍 DEBUG: check role read from Firestore
+    final role = await _userRepo.getCurrentUserRole();
+    debugPrint("ROLE FROM FIRESTORE = [$role]");
+
+    if (!mounted) return;
+
+    // 2️⃣ Route based on role
+    if (role.trim().toLowerCase() == "admin") {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const AdminDashboard()),
       );
-
-      if (!mounted) return;
-
-      Navigator.pushReplacementNamed(context, '/home');
-    } catch (e) {
-      if (!mounted) return;
-
-      // ✅ Show friendly message from UserRepository
-      final msg = e.toString().replaceAll("Exception: ", "");
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg)),
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
       );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
+  } catch (e) {
+    if (!mounted) return;
+
+    final msg = e.toString().replaceAll("Exception: ", "");
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg)),
+    );
+  } finally {
+    if (mounted) setState(() => _isLoading = false);
   }
+}
+
 
   /// 🔐 FORGOT PASSWORD
   void _showForgotPasswordDialog() {
@@ -221,8 +253,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content:
-                          Text("Password reset email sent to $email"),
+                      content: Text("Password reset email sent to $email"),
                     ),
                   );
                 } catch (_) {
