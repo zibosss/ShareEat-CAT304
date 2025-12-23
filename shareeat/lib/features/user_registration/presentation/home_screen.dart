@@ -5,12 +5,12 @@ import 'profile_screen.dart';
 import '../data/user_model.dart';
 import '../data/user_repository.dart';
 
-// ✅ EXISTING FOOD LISTING IMPORTS
+// Food listing
 import '../../food_listing/presentation/food_list_screen.dart';
 import '../../food_listing/presentation/add_food_screen.dart';
 
-// ✅ NEW IMPORT FOR BOOKING SCREEN (Check this path matches your folder)
-import '../../food_listing/presentation/booking_screen.dart';
+// ✅ Booking screen (with alias)
+import '../../food_listing/presentation/booking_screen.dart' as booking;
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -56,10 +56,22 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     if (result == true) {
-      // ✅ go back to Home tab so user can immediately see the new food
+      // go back to Home tab so user can immediately see the new food
       setState(() => _selectedIndex = 0);
       _foodListKey.currentState?.reloadFoods();
     }
+  }
+
+  Future<void> _navigateToBookings() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const booking.BookingScreen(), // ✅ use alias + const
+      ),
+    );
+    // after coming back from bookings, refresh home
+    _loadCurrentUser();
+    _foodListKey.currentState?.reloadFoods();
   }
 
   Future<void> _confirmLogout() async {
@@ -93,11 +105,19 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onNavTap(int index) {
+    // Index 1 = Add Food (modal)
     if (index == 1) {
       _navigateToAddFood();
       return;
     }
 
+    // Index 2 = Bookings (push new screen)
+    if (index == 2) {
+      _navigateToBookings();
+      return;
+    }
+
+    // Index 0 = Home, Index 3 = Profile
     setState(() => _selectedIndex = index);
 
     if (index == 0) {
@@ -114,20 +134,20 @@ class _HomeScreenState extends State<HomeScreen> {
       body: IndexedStack(
         index: _selectedIndex,
         children: [
-          // Index 0: Home
+          // 0: Home (food list)
           FoodListScreen(
             key: _foodListKey,
             username: _currentUser?.username,
             isLoadingUser: _isLoadingUser,
           ),
-          
-          // Index 1: Add Food (Placeholder, handled by modal)
+
+          // 1: Add Food – handled by modal, keep empty
           const SizedBox.shrink(),
-          
-          // Index 2: Bookings (✅ REPLACED PLACEHOLDER WITH REAL SCREEN)
-          const BookingScreen(), 
-          
-          // Index 3: Profile
+
+          // 2: Bookings – opened via Navigator, keep empty
+          const SizedBox.shrink(),
+
+          // 3: Profile
           const ProfileScreen(),
         ],
       ),
@@ -159,7 +179,11 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       title: const Text(
         "ShareEat",
-        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+        ),
       ),
       actions: [
         Padding(
@@ -177,7 +201,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     Text(
                       _currentUser?.username ?? "",
-                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     const SizedBox(width: 10),
                     GestureDetector(
@@ -185,11 +213,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: CircleAvatar(
                         radius: 22,
                         backgroundColor: Colors.white24,
-                        backgroundImage: (_currentUser != null && _currentUser!.profileImageUrl.isNotEmpty)
+                        backgroundImage: (_currentUser != null &&
+                                _currentUser!.profileImageUrl.isNotEmpty)
                             ? NetworkImage(_currentUser!.profileImageUrl)
                             : null,
-                        child: (_currentUser == null || _currentUser!.profileImageUrl.isEmpty)
-                            ? const Icon(Icons.person, size: 22, color: Colors.white)
+                        child: (_currentUser == null ||
+                                _currentUser!.profileImageUrl.isEmpty)
+                            ? const Icon(Icons.person,
+                                size: 22, color: Colors.white)
                             : null,
                       ),
                     ),
@@ -204,7 +235,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final bool isActive = _selectedIndex == index;
     return InkWell(
       onTap: () => _onNavTap(index),
-      child: Icon(icon, color: isActive ? Colors.white : Colors.white70, size: 28),
+      child: Icon(
+        icon,
+        color: isActive ? Colors.white : Colors.white70,
+        size: 28,
+      ),
     );
   }
 }

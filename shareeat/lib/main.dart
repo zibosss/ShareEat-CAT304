@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_core/firebase_core.dart';
+
 import 'firebase_options.dart';
 
+// Auth / user-facing screens
 import 'features/user_registration/presentation/welcome_screen.dart';
 import 'features/user_registration/presentation/login_screen.dart';
 import 'features/user_registration/presentation/registration_screen.dart';
@@ -12,12 +14,10 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   if (kIsWeb) {
-    // Web needs explicit options
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
   } else {
-    // Android (and others using native config) – no options
     await Firebase.initializeApp();
   }
 
