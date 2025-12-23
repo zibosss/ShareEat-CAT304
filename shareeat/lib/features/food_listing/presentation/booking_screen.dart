@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
-// ✅ IMPORTS (Adjust these to match your folder structure if needed)
 import 'package:shareeat/features/food_listing/data/booking_repository.dart';
 import 'package:shareeat/features/food_listing/data/data/models/booking_model.dart';
 
@@ -21,6 +20,18 @@ class BookingScreen extends StatelessWidget {
           title: const Text("My Bookings", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
           backgroundColor: Colors.white,
           elevation: 0,
+          
+          // ✅ NEW: Custom Back Button to go to Home Listing
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.black),
+            onPressed: () {
+              // This clears the navigation history and goes to Home
+              // ⚠️ Ensure your home route is named '/home' in main.dart
+              // If your home is '/', change this to '/'
+              Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+            },
+          ),
+
           bottom: const TabBar(
             labelColor: Color(0xFF7A2B93),
             unselectedLabelColor: Colors.grey,
@@ -34,7 +45,7 @@ class BookingScreen extends StatelessWidget {
         body: const TabBarView(
           children: [
             _MyRequestsTab(),
-            _MyDonationsTab(), // This is the section we fixed
+            _MyDonationsTab(),
           ],
         ),
       ),
@@ -43,10 +54,54 @@ class BookingScreen extends StatelessWidget {
 }
 
 /* =========================================================
-   TAB 1: MY REQUESTS (For users requesting food)
+   TAB 1: MY REQUESTS (Same as before)
    ========================================================= */
 class _MyRequestsTab extends StatelessWidget {
   const _MyRequestsTab();
+
+  void _showBookingOptions(BuildContext context, BookingModel booking) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(booking.foodTitle),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Requested Quantity: ${booking.quantity}"),
+            const SizedBox(height: 10),
+            Text("Status: ${booking.status.toUpperCase()}", 
+                 style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 20),
+            const Text("Do you want to cancel this request? This will remove the item and restore the stock."),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Close"),
+          ),
+          if (booking.status == 'pending')
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+              icon: const Icon(Icons.delete_forever, size: 18),
+              label: const Text("Cancel Request"),
+              onPressed: () async {
+                try {
+                  Navigator.pop(ctx);
+                  await BookingRepository().cancelBooking(booking);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Request cancelled & stock restored.")));
+                  }
+                } catch (e) {
+                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+                }
+              },
+            ),
+        ],
+      ),
+    );
+  }
 
   void _showQRCode(BuildContext context, String qrData) {
     showDialog(
@@ -58,44 +113,17 @@ class _MyRequestsTab extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                "Verification Code",
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
+              const Text("Verification Code", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 20),
               Container(
                 padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
+                decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade200), borderRadius: BorderRadius.circular(10)),
                 child: qrData.isNotEmpty 
-                  ? QrImageView(
-                      data: qrData,
-                      version: QrVersions.auto,
-                      size: 220.0,
-                      backgroundColor: Colors.white,
-                    )
-                  : const Column(
-                      children: [
-                        Icon(Icons.error_outline, size: 50, color: Colors.orange),
-                        SizedBox(height: 10),
-                        Text("QR Data Missing"),
-                      ],
-                    ),
+                  ? QrImageView(data: qrData, version: QrVersions.auto, size: 220.0, backgroundColor: Colors.white)
+                  : const Icon(Icons.error, size: 50),
               ),
               const SizedBox(height: 20),
-              const Text("Show this to the donor", style: TextStyle(color: Colors.grey)),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF7A2B93),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                child: const Text("Close", style: TextStyle(color: Colors.white)),
-              ),
+              ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text("Close")),
             ],
           ),
         ),
@@ -111,36 +139,20 @@ class _MyRequestsTab extends StatelessWidget {
     return StreamBuilder<List<BookingModel>>(
       stream: BookingRepository().watchMyBookings(userId),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return Center(child: Text("Error: ${snapshot.error}"));
-        }
+        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+        if (snapshot.hasError) return Center(child: Text("Error: ${snapshot.error}"));
 
         final bookings = snapshot.data ?? [];
-        if (bookings.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.fastfood_outlined, size: 60, color: Colors.grey[300]),
-                const SizedBox(height: 16),
-                const Text("No requests yet", style: TextStyle(color: Colors.grey)),
-              ],
-            ),
-          );
-        }
+        if (bookings.isEmpty) return const Center(child: Text("No requests yet"));
 
         return ListView.separated(
           padding: const EdgeInsets.all(16),
           itemCount: bookings.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 12),
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
           itemBuilder: (context, index) {
             final booking = bookings[index];
             final dateStr = DateFormat('dd MMM, hh:mm a').format(booking.createdAt);
-            final bool hasQr = booking.qrCodeData.isNotEmpty;
-
+            
             Color statusColor;
             switch (booking.status.toLowerCase()) {
               case 'completed': statusColor = Colors.blue; break;
@@ -151,52 +163,40 @@ class _MyRequestsTab extends StatelessWidget {
             return Card(
               elevation: 2,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            booking.foodTitle,
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(15),
+                onTap: () => _showBookingOptions(context, booking),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(child: Text(booking.foodTitle, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: statusColor.withOpacity(0.5))),
+                            child: Text(booking.status.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold)),
                           ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: statusColor.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: statusColor.withOpacity(0.5)),
-                          ),
-                          child: Text(
-                            booking.status.toUpperCase(),
-                            style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text("Requested: $dateStr", style: TextStyle(color: Colors.grey[600], fontSize: 13)),
-                    const SizedBox(height: 16),
-                    const Divider(),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: ElevatedButton.icon(
-                        onPressed: hasQr ? () => _showQRCode(context, booking.qrCodeData) : null,
-                        icon: const Icon(Icons.qr_code, size: 18),
-                        label: Text(hasQr ? "View QR" : "No QR"),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF7A2B93),
-                          foregroundColor: Colors.white,
-                          disabledBackgroundColor: Colors.grey[300],
-                        ),
+                        ],
                       ),
-                    )
-                  ],
+                      const SizedBox(height: 8),
+                      Text("Requested: ${booking.quantity} items  •  $dateStr", style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+                      const SizedBox(height: 16),
+                      const Divider(),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: ElevatedButton.icon(
+                          onPressed: booking.qrCodeData.isNotEmpty ? () => _showQRCode(context, booking.qrCodeData) : null,
+                          icon: const Icon(Icons.qr_code, size: 18),
+                          label: const Text("View QR"),
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7A2B93), foregroundColor: Colors.white),
+                        ),
+                      )
+                    ],
+                  ),
                 ),
               ),
             );
@@ -208,7 +208,7 @@ class _MyRequestsTab extends StatelessWidget {
 }
 
 /* =========================================================
-   TAB 2: MY DONATIONS (For donors to verify pickup)
+   TAB 2: MY DONATIONS (Same as before)
    ========================================================= */
 class _MyDonationsTab extends StatelessWidget {
   const _MyDonationsTab();
@@ -219,60 +219,18 @@ class _MyDonationsTab extends StatelessWidget {
     if (userId == null) return const Center(child: Text("Please log in"));
 
     return StreamBuilder<List<BookingModel>>(
-      // ✅ This calls the repository to find requests WHERE ownerId == You
       stream: BookingRepository().watchMyDonations(userId),
       builder: (context, snapshot) {
-        
-        // 1. Loading State
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        // 2. Error State (This fixes the "infinite spinner" problem)
-        if (snapshot.hasError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.warning_amber_rounded, size: 50, color: Colors.red),
-                  const SizedBox(height: 10),
-                  const Text("Database Error", style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 5),
-                  Text(
-                    "${snapshot.error}",
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.red, fontSize: 12),
-                  ),
-                  const SizedBox(height: 10),
-                  const Text("(Check your debug console for a link to fix this)", style: TextStyle(color: Colors.grey)),
-                ],
-              ),
-            ),
-          );
-        }
+        if (snapshot.hasError) return Center(child: Text("Error: ${snapshot.error}", textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)));
+        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
 
         final donations = snapshot.data ?? [];
+        if (donations.isEmpty) return const Center(child: Text("No incoming requests"));
 
-        // 3. Empty State
-        if (donations.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.volunteer_activism, size: 60, color: Colors.grey[300]),
-                const SizedBox(height: 16),
-                const Text("No incoming requests yet", style: TextStyle(color: Colors.grey)),
-              ],
-            ),
-          );
-        }
-
-        // 4. List of Requests
-        return ListView.builder(
+        return ListView.separated(
           padding: const EdgeInsets.all(16),
           itemCount: donations.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
           itemBuilder: (context, index) {
             final booking = donations[index];
             final bool isCompleted = booking.status == 'completed';
@@ -288,52 +246,26 @@ class _MyDonationsTab extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Expanded(
-                          child: Text(
-                            booking.foodTitle,
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                        ),
+                        Expanded(child: Text(booking.foodTitle, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: isCompleted ? Colors.blue[50] : Colors.orange[50],
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: isCompleted ? Colors.blue : Colors.orange),
-                          ),
-                          child: Text(
-                            booking.status.toUpperCase(),
-                            style: TextStyle(
-                              color: isCompleted ? Colors.blue : Colors.orange,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 10,
-                            ),
-                          ),
+                          decoration: BoxDecoration(color: isCompleted ? Colors.blue[50] : Colors.orange[50], borderRadius: BorderRadius.circular(8)),
+                          child: Text(booking.status.toUpperCase(), style: TextStyle(color: isCompleted ? Colors.blue : Colors.orange, fontSize: 10, fontWeight: FontWeight.bold)),
                         ),
                       ],
                     ),
+                    const SizedBox(height: 8),
+                    Text("Request for: ${booking.quantity} items"),
                     const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         icon: const Icon(Icons.qr_code_scanner),
                         label: Text(isCompleted ? "Pickup Completed" : "Scan to Verify"),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: isCompleted ? Colors.grey : const Color(0xFF7A2B93),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                        onPressed: isCompleted
-                            ? null
-                            : () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => _ScanQrScreen(booking: booking),
-                                  ),
-                                );
-                              },
+                        style: ElevatedButton.styleFrom(backgroundColor: isCompleted ? Colors.grey : const Color(0xFF7A2B93), foregroundColor: Colors.white),
+                        onPressed: isCompleted ? null : () {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => _ScanQrScreen(booking: booking)));
+                        },
                       ),
                     ),
                   ],
@@ -347,9 +279,7 @@ class _MyDonationsTab extends StatelessWidget {
   }
 }
 
-/* =========================================================
-   SCANNER SCREEN (To Verify QR)
-   ========================================================= */
+// SCANNER SCREEN (Same as before)
 class _ScanQrScreen extends StatefulWidget {
   final BookingModel booking;
   const _ScanQrScreen({required this.booking});
@@ -369,37 +299,17 @@ class _ScanQrScreenState extends State<_ScanQrScreen> {
         onDetect: (BarcodeCapture capture) async {
           if (_isVerified) return;
           if (capture.barcodes.isEmpty) return;
-
           final Barcode barcode = capture.barcodes.first;
-          final String? scannedCode = barcode.rawValue;
+          if (barcode.rawValue == null) return;
 
-          if (scannedCode == null) return;
-
-          // Compare Code
-          if (scannedCode == widget.booking.qrCodeData) {
+          if (barcode.rawValue == widget.booking.qrCodeData) {
             setState(() { _isVerified = true; });
-
-            // Mark as completed
             await BookingRepository().markBookingCompleted(widget.booking.id);
-
             if (!mounted) return;
-
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text("Verified! Hand over the food."),
-                backgroundColor: Colors.green,
-              ),
-            );
-
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Verified!"), backgroundColor: Colors.green));
             Navigator.pop(context);
           } else {
-             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text("Wrong QR Code!"),
-                backgroundColor: Colors.red,
-                duration: Duration(milliseconds: 500),
-              ),
-            );
+             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Wrong QR!"), backgroundColor: Colors.red));
           }
         },
       ),

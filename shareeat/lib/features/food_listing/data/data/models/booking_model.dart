@@ -8,8 +8,9 @@ class BookingModel {
   final String requesterId;
   final String ownerId;
   final String status;
-  final String qrCodeData; // <--- NEW FIELD
+  final String qrCodeData;
   final DateTime createdAt;
+  final int quantity; // ✅ NEW FIELD
 
   BookingModel({
     required this.id,
@@ -19,8 +20,9 @@ class BookingModel {
     required this.requesterId,
     required this.ownerId,
     required this.status,
-    required this.qrCodeData, // <--- NEW FIELD
+    required this.qrCodeData,
     required this.createdAt,
+    required this.quantity, // ✅ REQUIRED
   });
 
   Map<String, dynamic> toJson() {
@@ -31,8 +33,9 @@ class BookingModel {
       'requesterId': requesterId,
       'ownerId': ownerId,
       'status': status,
-      'qrCodeData': qrCodeData, // <--- SAVE TO FIRESTORE
+      'qrCodeData': qrCodeData,
       'createdAt': FieldValue.serverTimestamp(),
+      'quantity': quantity, // ✅ SAVE TO DB
     };
   }
 
@@ -46,9 +49,9 @@ class BookingModel {
       requesterId: data['requesterId'] ?? '',
       ownerId: data['ownerId'] ?? '',
       status: data['status'] ?? 'pending',
-     qrCodeData: (data['qrCodeData'] as String?) ?? 'NO_QR_DATA',
- // <--- READ FROM FIRESTORE
+      qrCodeData: data['qrCodeData'] ?? '',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      quantity: data['quantity'] ?? 1, // ✅ READ FROM DB
     );
   }
 }

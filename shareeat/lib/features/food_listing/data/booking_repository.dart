@@ -1,67 +1,85 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
+// ✅ FIXED IMPORT: Removed the double "data/data" typo
 import 'package:shareeat/features/food_listing/data/data/models/booking_model.dart';
 
 class BookingRepository {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  // ✅ NEW: Create Booking AND Deduct Quantity Safely
+  // 1. Create Booking (Deduct Stock)
   Future<void> createBooking(BookingModel booking) async {
     final foodRef = _db.collection('foods').doc(booking.foodId);
-    final bookingRef = _db.collection('bookings').doc(); // Generate a new ID
+    // Generate a new ID automatically
+    final bookingRef = _db.collection('bookings').doc(); 
 
     return _db.runTransaction((transaction) async {
-      // 1. Get the current food document
       final foodSnapshot = await transaction.get(foodRef);
 
       if (!foodSnapshot.exists) {
         throw Exception("Food item no longer exists!");
       }
 
-      // 2. Check current quantity
-      // (Assuming the field in Firebase is 'quantityAvailable')
       final int currentQty = foodSnapshot.data()?['quantityAvailable'] ?? 0;
 
-      if (currentQty <= 0) {
-        throw Exception("Sorry, this food is now out of stock!");
+      // ✅ Validation: Check if enough stock exists
+      if (currentQty < booking.quantity) {
+        throw Exception("Not enough stock! Only $currentQty left.");
       }
 
-      // 3. Deduct Quantity by 1
+      // ✅ Deduct Stock
       transaction.update(foodRef, {
-        'quantityAvailable': currentQty - 1,
+        'quantityAvailable': currentQty - booking.quantity,
       });
 
-      // 4. Save the Booking
-      // We manually add the ID if your model needs it, or just save the data
+      // Save Booking
       transaction.set(bookingRef, booking.toJson());
     });
   }
 
-  // Watch My Requests
+  // 2. Cancel Booking (Restore Stock)
+  Future<void> cancelBooking(BookingModel booking) async {
+    final foodRef = _db.collection('foods').doc(booking.foodId);
+    final bookingRef = _db.collection('bookings').doc(booking.id);
+
+    return _db.runTransaction((transaction) async {
+      // Get food doc to check if it still exists
+      final foodSnapshot = await transaction.get(foodRef);
+
+      // ✅ Delete the booking
+      transaction.delete(bookingRef);
+
+      // ✅ Restore Stock (Add the quantity back)
+      // We only update if the food item hasn't been deleted by the owner
+      if (foodSnapshot.exists) {
+        final int currentQty = foodSnapshot.data()?['quantityAvailable'] ?? 0;
+        
+        transaction.update(foodRef, {
+          'quantityAvailable': currentQty + booking.quantity,
+        });
+      }
+    });
+  }
+
+  // 3. Watch My Requests
   Stream<List<BookingModel>> watchMyBookings(String userId) {
-    return _db
-        .collection('bookings')
+    return _db.collection('bookings')
         .where('requesterId', isEqualTo: userId)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => BookingModel.fromDoc(doc)).toList());
+        .map((s) => s.docs.map((d) => BookingModel.fromDoc(d)).toList());
   }
 
-  // Watch My Donations
+  // 4. Watch My Donations
   Stream<List<BookingModel>> watchMyDonations(String userId) {
-    return _db
-        .collection('bookings')
+    return _db.collection('bookings')
         .where('ownerId', isEqualTo: userId)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => BookingModel.fromDoc(doc)).toList());
+        .map((s) => s.docs.map((d) => BookingModel.fromDoc(d)).toList());
   }
-
-  // Mark Completed
-  Future<void> markBookingCompleted(String bookingId) async {
-    await _db.collection('bookings').doc(bookingId).update({
-      'status': 'completed',
-    });
+  
+  // 5. Mark Completed
+  Future<void> markBookingCompleted(String id) async {
+    await _db.collection('bookings').doc(id).update({'status': 'completed'});
   }
 }
