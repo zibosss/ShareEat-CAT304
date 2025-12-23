@@ -111,6 +111,22 @@ class UserRepository {
     return role.trim().toLowerCase() == "admin";
   }
 
+  /// GET USER PROFILE BY UID (FOR DONOR INFO)
+// Inside lib/features/user_registration/data/user_repository.dart
+
+Future<AppUser?> getUserById(String uid) async {
+  try {
+    DocumentSnapshot doc = await _db.collection('users').doc(uid).get();
+    if (doc.exists && doc.data() != null) {
+      // Ensure your AppUser.fromMap handles the data correctly
+      return AppUser.fromMap(doc.data() as Map<String, dynamic>);
+    }
+    return null; 
+  } catch (e) {
+    print("Error getting donor info: $e");
+    return null;
+  }
+}
 
   /// UPDATE USER PROFILE
   Future<void> updateUserProfile(AppUser user) async {

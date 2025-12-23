@@ -5,9 +5,12 @@ import 'profile_screen.dart';
 import '../data/user_model.dart';
 import '../data/user_repository.dart';
 
-// ✅ FIX THESE PATHS to match your real folder:
+// ✅ EXISTING FOOD LISTING IMPORTS
 import '../../food_listing/presentation/food_list_screen.dart';
 import '../../food_listing/presentation/add_food_screen.dart';
+
+// ✅ NEW IMPORT FOR BOOKING SCREEN (Check this path matches your folder)
+import '../../food_listing/presentation/booking_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -111,13 +114,20 @@ class _HomeScreenState extends State<HomeScreen> {
       body: IndexedStack(
         index: _selectedIndex,
         children: [
+          // Index 0: Home
           FoodListScreen(
             key: _foodListKey,
             username: _currentUser?.username,
             isLoadingUser: _isLoadingUser,
           ),
+          
+          // Index 1: Add Food (Placeholder, handled by modal)
           const SizedBox.shrink(),
-          const Center(child: Text("Bookings")), // keep placeholder
+          
+          // Index 2: Bookings (✅ REPLACED PLACEHOLDER WITH REAL SCREEN)
+          const BookingScreen(), 
+          
+          // Index 3: Profile
           const ProfileScreen(),
         ],
       ),
