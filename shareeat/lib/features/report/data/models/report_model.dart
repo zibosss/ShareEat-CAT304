@@ -4,13 +4,14 @@ class ReportModel {
   final String id;
   final String reportType;
   final String reportedUsername;
+  final String reportedUserUid;  // 👈 make sure this exists
   final String description;
   final String? evidenceUrl;
 
   final String reporterUid;
   final String reporterName;
 
-  final String status; // pending | under_review | resolved | rejected
+  final String status; // pending | rejected | banned | ...
   final String? adminNote;
 
   final DateTime createdAt;
@@ -19,6 +20,7 @@ class ReportModel {
     required this.id,
     required this.reportType,
     required this.reportedUsername,
+    required this.reportedUserUid,
     required this.description,
     required this.reporterUid,
     required this.reporterName,
@@ -32,6 +34,7 @@ class ReportModel {
     return {
       'reportType': reportType,
       'reportedUsername': reportedUsername,
+      'reportedUserUid': reportedUserUid,   // 👈 save it properly
       'description': description,
       'evidenceUrl': evidenceUrl,
       'reporterUid': reporterUid,
@@ -44,17 +47,25 @@ class ReportModel {
 
   static ReportModel fromDoc(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+
+    // 👇 Try both keys so your old reports still load
+    final uid = (data['reportedUserUid'] ??
+            data['reportedUserId'] ??  // old key
+            '') as String;
+
     return ReportModel(
       id: doc.id,
       reportType: (data['reportType'] ?? '') as String,
       reportedUsername: (data['reportedUsername'] ?? '') as String,
+      reportedUserUid: uid,
       description: (data['description'] ?? '') as String,
       evidenceUrl: data['evidenceUrl'] as String?,
       reporterUid: (data['reporterUid'] ?? '') as String,
       reporterName: (data['reporterName'] ?? 'User') as String,
       status: (data['status'] ?? 'pending') as String,
       adminNote: data['adminNote'] as String?,
-      createdAt: ((data['createdAt'] as Timestamp?)?.toDate()) ?? DateTime.now(),
+      createdAt:
+          ((data['createdAt'] as Timestamp?)?.toDate()) ?? DateTime.now(),
     );
   }
 }

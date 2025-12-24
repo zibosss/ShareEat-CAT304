@@ -10,7 +10,8 @@ class AppUser {
   final String profileImageUrl;
 
   // NEW
-  final String role; // "user" or "admin"
+  final String role;      // "user" or "admin"
+  final bool isBanned;    // true = banned from using app
 
   AppUser({
     required this.uid,
@@ -21,6 +22,7 @@ class AppUser {
     required this.gender,
     required this.profileImageUrl,
     this.role = "user",
+    this.isBanned = false,
   });
 
   Map<String, dynamic> toMap() => {
@@ -31,7 +33,8 @@ class AppUser {
         'contactNumber': contactNumber,
         'gender': gender,
         'profileImageUrl': profileImageUrl,
-        'role': role, // NEW
+        'role': role,
+        'isBanned': isBanned,
       };
 
   factory AppUser.fromMap(Map<String, dynamic> map) => AppUser(
@@ -42,6 +45,7 @@ class AppUser {
         contactNumber: map['contactNumber']?.toString() ?? '',
         gender: map['gender']?.toString() ?? '',
         profileImageUrl: map['profileImageUrl']?.toString() ?? '',
-        role: map['role']?.toString() ?? 'user', // NEW
+        role: map['role']?.toString() ?? 'user',
+        isBanned: (map['isBanned'] as bool?) ?? false,
       );
 }

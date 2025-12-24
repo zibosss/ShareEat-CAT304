@@ -1,12 +1,14 @@
+// lib/features/user_registration/presentation/login_screen.dart
 // ignore_for_file: use_build_context_synchronously
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+
 import '../data/user_repository.dart';
+import '../data/user_model.dart';
 
 import '../../report/presentation/admin_dashboard.dart';
-import 'home_screen.dart';  // 👈 relative import, same folder
-
+import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -54,7 +56,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 12),
                 const Text(
                   "Welcome back",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
                 const SizedBox(height: 40),
 
@@ -169,32 +174,46 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // 1) Sign in with email & password
       await _userRepo.login(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
 
-      final current = FirebaseAuth.instance.currentUser;
-      debugPrint("LOGGED IN UID = ${current?.uid}");
-      debugPrint("LOGGED IN EMAIL = ${current?.email}");
-
-      final role = await _userRepo.getCurrentUserRole();
-      debugPrint("ROLE FROM FIRESTORE = [$role]");
+      // 2) Get the current AppUser from Firestore
+      AppUser? appUser = await _userRepo.getCurrentUserProfile();
+      final role = appUser?.role.trim().toLowerCase() ?? "user";
+      final isBanned = appUser?.isBanned == true;
 
       if (!mounted) return;
 
-          if (role.trim().toLowerCase() == "admin") {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const AdminDashboard()),
-            );
-          } else {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const HomeScreen()),
-            );
-          }
+      if (isBanned) {
+        // If banned, immediately sign out and show message
+        await FirebaseAuth.instance.signOut();
 
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Your account has been banned from ShareEat. "
+              "Please contact the system administrator.",
+            ),
+          ),
+        );
+        return; // do not navigate anywhere
+      }
+
+      // 3) Route based on role
+      if (role == "admin") {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const AdminDashboard()),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       final msg = e.toString().replaceAll("Exception: ", "");
@@ -254,8 +273,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 } catch (_) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content:
-                          Text("Failed to send reset email. Please try again."),
+                      content: Text(
+                        "Failed to send reset email. Please try again.",
+                      ),
                     ),
                   );
                 }

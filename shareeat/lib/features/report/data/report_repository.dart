@@ -1,66 +1,95 @@
-import 'dart:io';
+// lib/features/report/data/report_repository.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-
 import 'models/report_model.dart';
 
-
 class ReportRepository {
-  final _db = FirebaseFirestore.instance;
-  final _storage = FirebaseStorage.instance;
+  final CollectionReference _reportsRef =
+      FirebaseFirestore.instance.collection('reports');
 
-  CollectionReference get _reports => _db.collection('reports');
+  /// Stream reports for admin, filtered by status.
+  /// status = 'all' will return all reports.
+  Stream<List<ReportModel>> watchReports({String status = 'pending'}) {
+    Query query =
+        _reportsRef.orderBy('createdAt', descending: true);
 
-  Future<String?> uploadEvidence({
-    required File file,
-    required String reporterUid,
-  }) async {
-    final fileName = 'evidence_${DateTime.now().millisecondsSinceEpoch}.jpg';
-    final ref = _storage.ref().child('reports/$reporterUid/$fileName');
-    await ref.putFile(file);
-    return await ref.getDownloadURL();
-  }
-
-  Future<void> submitReport(ReportModel report) async {
-    await _reports.add(report.toMap());
-  }
-
-  Stream<List<ReportModel>> streamReports({String? status}) {
-    Query q = _reports.orderBy('createdAt', descending: true);
-    if (status != null && status.isNotEmpty) {
-      q = q.where('status', isEqualTo: status);
+    if (status != 'all') {
+      query = query.where('status', isEqualTo: status);
     }
-    return q.snapshots().map(
-          (snap) => snap.docs.map(ReportModel.fromDoc).toList(),
-        );
+
+    return query.snapshots().map(
+      (snapshot) =>
+          snapshot.docs.map((doc) => ReportModel.fromDoc(doc)).toList(),
+    );
   }
 
+  /// Mark a report as ignored / resolved / etc.
   Future<void> updateReportStatus({
     required String reportId,
     required String status,
     String? adminNote,
   }) async {
-    await _reports.doc(reportId).update({
+    await _reportsRef.doc(reportId).update({
       'status': status,
       'adminNote': adminNote,
+      'updatedAt': FieldValue.serverTimestamp(),
     });
   }
 
-  /// Simple counts for your analytics tab
-  Future<Map<String, int>> getAdminCounts() async {
-    final reportsSnap = await _reports.get();
-    final pendingSnap = await _reports.where('status', isEqualTo: 'pending').get();
+  /// 🔒 Recalculate isBanned on user document:
+  ///   isBanned = true  if ANY report for this user has status == "banned"
+  ///   isBanned = false otherwise
+  Future<void> _refreshUserBanFlag(String reportedUserUid) async {
+    if (reportedUserUid.isEmpty) return;
 
-    // Optional: only if these collections exist
-    final foodsSnap = await _db.collection('foods').get().catchError((_) => null);
-    final bookingsSnap = await _db.collection('bookings').get().catchError((_) => null);
+    final bannedSnapshot = await _reportsRef
+        .where('reportedUserUid', isEqualTo: reportedUserUid)
+        .where('status', isEqualTo: 'banned')
+        .limit(1)
+        .get();
 
-    return {
-      'reportsTotal': reportsSnap.size,
-      'reportsPending': pendingSnap.size,
-      'foodsTotal': foodsSnap.size,
-      'bookingsTotal': bookingsSnap.size,
-    };
+    final bool stillBanned = bannedSnapshot.docs.isNotEmpty;
+
+    final userRef =
+        FirebaseFirestore.instance.collection('users').doc(reportedUserUid);
+
+    await userRef.update({
+      'isBanned': stillBanned,
+    });
+  }
+
+  /// Ban a user and mark the report as "banned".
+  Future<void> banUserAndMarkReport({
+    required String reportId,
+    required String reportedUserUid,
+    String? adminNote,
+  }) async {
+    // 1) Update this report’s status -> banned
+    await _reportsRef.doc(reportId).update({
+      'status': 'banned',
+      'adminNote': adminNote,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    // 2) Recalculate global isBanned flag for that user
+    await _refreshUserBanFlag(reportedUserUid);
+  }
+
+  /// Unban user for THIS report -> report becomes REJECTED
+  /// and isBanned will be recalculated based on remaining bans.
+  Future<void> unbanUserAndRejectReport({
+    required String reportId,
+    required String reportedUserUid,
+    String? adminNote,
+  }) async {
+    // 1) This report is now rejected (fake/invalid)
+    await _reportsRef.doc(reportId).update({
+      'status': 'rejected',
+      'adminNote': adminNote ?? 'Ban reverted – report considered fake/invalid',
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    // 2) Recalculate global isBanned flag based on other reports
+    await _refreshUserBanFlag(reportedUserUid);
   }
 }

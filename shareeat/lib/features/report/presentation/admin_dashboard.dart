@@ -1,8 +1,10 @@
+// lib/features/report/presentation/admin_dashboard.dart
 // ignore_for_file: use_build_context_synchronously
 
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:shareeat/features/report/data/report_repository.dart';
@@ -24,7 +26,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
   final AnalyticsRepository _analyticsRepo = AnalyticsRepository();
 
   int _selectedIndex = 0;
-  String _statusFilter = 'pending';
+  // all | pending | rejected | banned
+  String _statusFilter = 'all';
 
   int _trendDays = 7; // 7 or 30
 
@@ -110,88 +113,105 @@ class _AdminDashboardState extends State<AdminDashboard> {
   // REPORTS TAB
   // =========================
   Widget _reportsTab() {
+    const List<Map<String, String>> statusOptions = [
+      {'value': 'all', 'label': 'All'},
+      {'value': 'pending', 'label': 'Pending'},
+      {'value': 'rejected', 'label': 'Rejected'},
+      {'value': 'banned', 'label': 'Banned'},
+    ];
+
     return Column(
       children: [
+        // Filter row
+        // Filter row (simplified: just "Status" + dropdown)
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
           child: Row(
             children: [
-              const Text("Status",
-                  style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(width: 10),
-              DropdownButton<String>(
-                value: _statusFilter,
-                underline: const SizedBox.shrink(),
-                items: const [
-                  DropdownMenuItem(value: 'pending', child: Text('Pending')),
-                  DropdownMenuItem(
-                      value: 'under_review', child: Text('Under review')),
-                  DropdownMenuItem(value: 'resolved', child: Text('Resolved')),
-                  DropdownMenuItem(value: 'rejected', child: Text('Rejected')),
-                ],
-                onChanged: (v) => setState(() {
-                  _statusFilter = v ?? 'pending';
-                }),
+              const Text(
+                "Status",
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _statusFilter,
+                    icon: const Icon(Icons.arrow_drop_down),
+                    items: statusOptions
+                        .map(
+                          (opt) => DropdownMenuItem(
+                            value: opt['value'],
+                            child: Text(opt['label']!),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) => setState(() {
+                      _statusFilter = v ?? 'all';
+                    }),
+                  ),
+                ),
               ),
             ],
           ),
         ),
+
+        const Divider(height: 1),
+
+        // List of reports
         Expanded(
           child: StreamBuilder<List<ReportModel>>(
-            stream: _reportRepo.streamReports(status: _statusFilter),
+            stream: _reportRepo.watchReports(status: _statusFilter),
             builder: (context, snapshot) {
-              if (!snapshot.hasData) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
 
-              final reports = snapshot.data!;
+              if (snapshot.hasError) {
+                return Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    "Failed to load reports:\n${snapshot.error}",
+                    style: const TextStyle(color: Colors.red),
+                    textAlign: TextAlign.center,
+                  ),
+                );
+              }
+
+              final reports = snapshot.data ?? [];
               if (reports.isEmpty) {
-                return const Center(child: Text("No reports found"));
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Text(
+                      _statusFilter == 'all'
+                          ? "🎉 No reports yet.\nUsers are behaving well."
+                          : "No reports under “${_statusFilter.toUpperCase()}”.\nTry switching the status filter.",
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ),
+                );
               }
 
               return ListView.separated(
                 padding: const EdgeInsets.all(16),
                 itemCount: reports.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
                 itemBuilder: (context, i) {
                   final r = reports[i];
-                  return InkWell(
-                    onTap: () => _openReportDetail(r),
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.black12),
-                      ),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            backgroundColor: purple.withOpacity(0.15),
-                            child: const Icon(Icons.report, color: purple),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(r.reportType,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold)),
-                                Text("Against: ${r.reportedUsername}"),
-                                Text(
-                                  "By: ${r.reporterName}",
-                                  style: const TextStyle(
-                                      fontSize: 12, color: Colors.black54),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Icon(Icons.chevron_right),
-                        ],
-                      ),
-                    ),
-                  );
+                  return _reportCard(r);
                 },
               );
             },
@@ -201,9 +221,147 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  // =========================
-  // REPORT DETAIL
-  // =========================
+  // Card UI for each report
+  Widget _reportCard(ReportModel r) {
+    final createdAtLabel = DateFormat('dd MMM yyyy, hh:mm a').format(r.createdAt);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: () => _openReportDetail(r),
+      splashColor: purple.withOpacity(0.08),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 22,
+              backgroundColor: purple.withOpacity(0.12),
+              child: const Icon(Icons.report_gmailerrorred, color: purple),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    r.reportType,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    "Against: ${r.reportedUsername}",
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    "By: ${r.reporterName}",
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.black54,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    createdAtLabel,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Colors.black45,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                _statusChip(r.status),
+                const SizedBox(height: 8),
+                const Icon(Icons.chevron_right, size: 20, color: Colors.black45),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Small pill showing status
+  Widget _statusChip(String status) {
+    String label = status.toUpperCase();
+    Color bg;
+    Color fg;
+    IconData icon;
+
+    switch (status) {
+      case 'pending':
+        bg = Colors.orange.shade100;
+        fg = Colors.orange.shade800;
+        icon = Icons.hourglass_top;
+        break;
+      case 'rejected':
+        bg = Colors.red.shade100;
+        fg = Colors.red.shade800;
+        icon = Icons.close;
+        break;
+      case 'banned':
+        bg = Colors.red.shade200;
+        fg = Colors.red.shade900;
+        icon = Icons.block;
+        break;
+      default: // for "all" or any other status
+        bg = Colors.green.shade100;
+        fg = Colors.green.shade800;
+        icon = Icons.check_circle;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: fg),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: fg,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // inside _AdminDashboardState in admin_dashboard.dart
+
   Future<void> _openReportDetail(ReportModel r) async {
     await showModalBottomSheet(
       context: context,
@@ -211,26 +369,210 @@ class _AdminDashboardState extends State<AdminDashboard> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
       ),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(r.reportType,
-                  style: const TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Text("Reported: ${r.reportedUsername}"),
-              Text("Reporter: ${r.reporterName}"),
-              const SizedBox(height: 12),
-              Text(r.description),
-            ],
+      builder: (_) {
+        return Padding(
+          padding:
+              EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.report, color: purple),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        r.reportType.isEmpty ? "Report detail" : r.reportType,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text("Reported person: ${r.reportedUsername}"),
+                Text("Reporter: ${r.reporterName}"),
+                const SizedBox(height: 12),
+                const Text(
+                  "Description",
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(r.description),
+                const SizedBox(height: 16),
+
+                if (r.evidenceUrl != null && r.evidenceUrl!.isNotEmpty)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        "Evidence attached",
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        "(For now only URL/flag is stored. You can show the image later.)",
+                        style: TextStyle(fontSize: 12, color: Colors.black54),
+                      ),
+                      SizedBox(height: 16),
+                    ],
+                  ),
+
+                const Divider(),
+                const SizedBox(height: 12),
+
+                // =======================
+                // ACTION BUTTONS
+                // =======================
+                if (r.status == 'banned') ...[
+                  // When the report is already banned:
+                  // 1) Unban user & reject report
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () async {
+                            await _reportRepo.unbanUserAndRejectReport(
+                              reportId: r.id,
+                              reportedUserUid: r.reportedUserUid,
+                              adminNote:
+                                  'Ban reverted – report considered fake / invalid',
+                            );
+
+                            Navigator.pop(context);
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  "User unbanned and report marked as REJECTED.",
+                                ),
+                              ),
+                            );
+                          },
+                          child: const Text("Unban user & reject report"),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    "Use this if you later find the report was fake or incorrect.",
+                    style: TextStyle(fontSize: 12, color: Colors.black54),
+                  ),
+                ] else ...[
+                  // Normal flow: Pending / Rejected etc.
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: r.status == 'rejected'
+                              ? null
+                              : () async {
+                                  await _reportRepo.updateReportStatus(
+                                    reportId: r.id,
+                                    status: 'rejected',
+                                    adminNote: 'No action taken',
+                                  );
+                                  Navigator.pop(context);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        "Report marked as 'Do not take action'.",
+                                      ),
+                                    ),
+                                  );
+                                },
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                              color: r.status == 'rejected'
+                                  ? Colors.grey
+                                  : Colors.grey.shade600,
+                            ),
+                          ),
+                          child: const Text("Do not take action"),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: r.status == 'banned'
+                              ? null
+                              : () async {
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (_) => AlertDialog(
+                                      title: const Text("Ban user"),
+                                      content: Text(
+                                        "Ban ${r.reportedUsername.isEmpty ? 'this user' : r.reportedUsername} from ShareEat?",
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context, false),
+                                          child: const Text("Cancel"),
+                                        ),
+                                        ElevatedButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context, true),
+                                          child: const Text("Ban"),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+
+                                  if (confirm != true) return;
+
+                                  await _reportRepo.banUserAndMarkReport(
+                                    reportId: r.id,
+                                    reportedUserUid: r.reportedUserUid,
+                                    adminNote: 'User banned by admin',
+                                  );
+
+                                  Navigator.pop(context);
+
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      backgroundColor: Colors.red,
+                                      content: Text(
+                                        "User banned and report updated.",
+                                      ),
+                                    ),
+                                  );
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text("Ban user & close report"),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    "Banned users will not be able to access ShareEat.",
+                    style: TextStyle(fontSize: 12, color: Colors.black54),
+                  ),
+                ],
+
+                const SizedBox(height: 12),
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
+
 
   // =========================
   // ANALYTICS TAB
@@ -266,7 +608,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
         final halal = halalCounts['halal'] ?? 0;
         final nonHalal = halalCounts['nonHalal'] ?? 0;
 
-        // NOTE: "Not available" here means not available or expired (estimate).
         final notAvailableOrExpired = math.max(0, totalFoods - availableFoods);
 
         return ListView(
@@ -278,7 +619,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ),
             const SizedBox(height: 12),
 
-            // KPI cards
             Wrap(
               spacing: 12,
               runSpacing: 12,
@@ -292,10 +632,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
             const SizedBox(height: 16),
 
-            // Donut charts (Halal + Availability)
             LayoutBuilder(
               builder: (context, constraints) {
-                final isNarrow = constraints.maxWidth < 700; // phone / small screen
+                final isNarrow = constraints.maxWidth < 700;
 
                 if (isNarrow) {
                   return Column(
@@ -345,10 +684,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
               },
             ),
 
-
             const SizedBox(height: 16),
 
-            // Trend bar chart
             _foodsTrendCard(trend),
 
             const SizedBox(height: 24),
@@ -362,17 +699,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
               const Text(
                 "No type/category data found. (If you don’t use category, it’s okay to ignore this.)",
               ),
-            ...topTypes.map((e) => Card(
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
-                  child: ListTile(
-                    title: Text(e['type'].toString()),
-                    trailing: Text(
-                      e['total'].toString(),
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
+            ...topTypes.map(
+              (e) => Card(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: ListTile(
+                  title: Text(e['type'].toString()),
+                  trailing: Text(
+                    e['total'].toString(),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                )),
+                ),
+              ),
+            ),
 
             const SizedBox(height: 24),
 
@@ -382,14 +722,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ),
             const SizedBox(height: 10),
             if (expiringSoon.isEmpty) const Text("No foods expiring soon 🎉"),
-            ...expiringSoon.map((e) => Card(
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
-                  child: ListTile(
-                    title: Text(e['title'].toString()),
-                    subtitle: Text("Qty: ${e['quantityAvailable']}"),
-                  ),
-                )),
+            ...expiringSoon.map(
+              (e) => Card(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: ListTile(
+                  title: Text(e['title'].toString()),
+                  subtitle: Text("Qty: ${e['quantityAvailable']}"),
+                ),
+              ),
+            ),
           ],
         );
       },
@@ -397,8 +740,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   // =========================
-  // TREND CARD
+  // TREND CARD / CHART / KPI / DONUT
   // =========================
+
   Widget _foodsTrendCard(List<Map<String, dynamic>> trend) {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -435,7 +779,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
               ],
             ),
             const SizedBox(height: 10),
-
             if (trend.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 8),
@@ -458,7 +801,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
     String shortLabel(String yyyyMmDd) => yyyyMmDd.split('-').last;
 
-    // ✅ auto aspect ratio based on number of bars (more bars => wider chart => less tall)
     final barsCount = data.length;
     final aspect = (barsCount <= 7)
         ? 2.2
@@ -466,7 +808,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ? 2.6
             : 3.2;
 
-    // Reserve space for X labels + bottom caption.
     const xLabelSpace = 18.0;
     const captionSpace = 18.0;
     const topValueSpace = 16.0;
@@ -475,14 +816,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
       aspectRatio: aspect,
       child: LayoutBuilder(
         builder: (context, c) {
-          // ✅ real drawable height for bars (prevents overflow on emulator)
           final barsAreaHeight =
               (c.maxHeight - xLabelSpace - captionSpace - topValueSpace)
                   .clamp(40.0, double.infinity);
 
           return Column(
             children: [
-              // Bars + value labels
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -491,7 +830,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     children: List.generate(data.length, (i) {
                       final total = (data[i]['total'] as int?) ?? 0;
                       final ratio = maxVal == 0 ? 0.0 : total / maxVal;
-                      final barH = (ratio * barsAreaHeight).clamp(2.0, barsAreaHeight);
+                      final barH =
+                          (ratio * barsAreaHeight).clamp(2.0, barsAreaHeight);
 
                       final showLabel = _trendDays == 7
                           ? true
@@ -503,7 +843,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              // value label (only show if space & useful)
                               SizedBox(
                                 height: topValueSpace,
                                 child: (_trendDays == 7 && total > 0)
@@ -519,25 +858,24 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                       )
                                     : const SizedBox.shrink(),
                               ),
-
-                              // bar
                               AnimatedContainer(
-                                duration: const Duration(milliseconds: 250),
+                                duration:
+                                    const Duration(milliseconds: 250),
                                 height: barH,
                                 decoration: BoxDecoration(
                                   color: purple,
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                               ),
-
-                              // x label
                               SizedBox(
                                 height: xLabelSpace,
                                 child: Center(
                                   child: showLabel
                                       ? Text(
-                                          shortLabel(data[i]['day'].toString()),
-                                          style: const TextStyle(fontSize: 10),
+                                          shortLabel(
+                                              data[i]['day'].toString()),
+                                          style:
+                                              const TextStyle(fontSize: 10),
                                         )
                                       : const SizedBox.shrink(),
                                 ),
@@ -550,8 +888,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   ),
                 ),
               ),
-
-              // bottom caption
               SizedBox(
                 height: captionSpace,
                 child: Center(
@@ -559,7 +895,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     _trendDays == 7
                         ? "Last 7 days (day of month)"
                         : "Last 30 days (labels every 5 days)",
-                    style: const TextStyle(fontSize: 12, color: Colors.black54),
+                    style: const TextStyle(
+                        fontSize: 12, color: Colors.black54),
                   ),
                 ),
               ),
@@ -569,7 +906,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
       ),
     );
   }
-
 
   Widget _trendChip(String label,
       {required bool isActive, required VoidCallback onTap}) {
@@ -594,9 +930,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  // =========================
-  // KPI CARD
-  // =========================
   Widget _kpiCard(String title, int value) {
     return SizedBox(
       width: 160,
@@ -613,8 +946,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
               const SizedBox(height: 6),
               Text(
                 "$value",
-                style:
-                    const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                    fontSize: 22, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -623,9 +956,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  // =========================
-  // DONUT CARD (custom painter)
-  // =========================
   Widget _donutCard({
     required String title,
     required String aLabel,
@@ -642,14 +972,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title,
-                style:
-                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            Text(
+              title,
+              style:
+                  const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+            ),
             const SizedBox(height: 10),
             Row(
               children: [
                 SizedBox(
-                  width: 140, // just a “max width”, AspectRatio keeps it square
+                  width: 140,
                   child: AspectRatio(
                     aspectRatio: 1,
                     child: CustomPaint(
@@ -662,13 +994,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       child: Center(
                         child: Text(
                           "${aValue + bValue}",
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 14),
                         ),
                       ),
                     ),
                   ),
                 ),
-
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -697,15 +1029,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 8),
-        Expanded(child: Text(label, style: const TextStyle(fontSize: 12))),
-        Text("$value",
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+        Expanded(
+          child: Text(label, style: const TextStyle(fontSize: 12)),
+        ),
+        Text(
+          "$value",
+          style: const TextStyle(
+              fontWeight: FontWeight.bold, fontSize: 12),
+        ),
       ],
     );
   }
 
   // =========================
-  // HELPERS
+  // NAV + LOGOUT
   // =========================
   Widget _navButton(IconData icon, int index) {
     final active = _selectedIndex == index;
