@@ -1,6 +1,7 @@
 // ignore_for_file: deprecated_member_use, avoid_print
 
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -40,6 +41,74 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
   bool _isLoading = false;
   bool _showLocationScreen = false;
   bool _isLoadingLocation = true;
+
+  // ===================== USM RADIUS (IMPORTANT) =====================
+  final LatLng _usmCenter = const LatLng(5.3574, 100.2987); 
+  final double _usmRadiusMeters = 1500;  
+  Set<Circle> _usmCircles = {};
+  // ================================================================
+
+  @override
+  void initState() {
+    super.initState();
+
+    _usmCircles = {
+      Circle(
+        circleId: const CircleId('usm_radius'),
+        center: _usmCenter,
+        radius: _usmRadiusMeters,
+        strokeWidth: 2,
+        strokeColor: const Color(0xFF7A2B93),
+        fillColor: const Color(0xFF7A2B93).withOpacity(0.12),
+      ),
+    };
+  }
+
+  LatLngBounds _boundsFromCenter(LatLng center, double radiusMeters) {
+    final lat = center.latitude;
+    final lng = center.longitude;
+
+    final dLat = radiusMeters / 111320.0;
+    final dLng = radiusMeters / (111320.0 * math.cos(lat * math.pi / 180));
+
+    final south = lat - dLat;
+    final north = lat + dLat;
+    final west = lng - dLng;
+    final east = lng + dLng;
+
+    return LatLngBounds(
+      southwest: LatLng(
+        south < north ? south : north,
+        west < east ? west : east,
+      ),
+      northeast: LatLng(
+        south > north ? south : north,
+        west > east ? west : east,
+      ),
+    );
+  }
+
+  Future<void> _onTapMapRestricted(LatLng pos) async {
+    final dist = Geolocator.distanceBetween(
+      _usmCenter.latitude,
+      _usmCenter.longitude,
+      pos.latitude,
+      pos.longitude,
+    );
+
+    if (dist > _usmRadiusMeters) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Location must be within USM Main Campus area.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _selectedLocation = pos);
+  }
 
   Future<void> _getCurrentLocation() async {
     if (!_isMapCreated) return;
@@ -90,6 +159,30 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
 
       if (!mounted) return;
+
+      // ✅ IMPORTANT: block GPS pin outside campus radius
+      final dist = Geolocator.distanceBetween(
+        _usmCenter.latitude,
+        _usmCenter.longitude,
+        position.latitude,
+        position.longitude,
+      );
+
+      if (dist > _usmRadiusMeters) {
+        setState(() => _isLoadingLocation = false);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('You are outside USM campus radius.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+
+        _mapController?.animateCamera(
+          CameraUpdate.newLatLngZoom(_usmCenter, 14),
+        );
+        return;
+      }
 
       setState(() {
         _selectedLocation = LatLng(position.latitude, position.longitude);
@@ -170,6 +263,20 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       return;
     }
 
+    // ✅ EXTRA SAFETY: don’t allow submit outside radius even if something bypasses UI
+    final dist = Geolocator.distanceBetween(
+      _usmCenter.latitude,
+      _usmCenter.longitude,
+      _selectedLocation!.latitude,
+      _selectedLocation!.longitude,
+    );
+    if (dist > _usmRadiusMeters) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selected location is outside USM campus area.'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -204,7 +311,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       latitude: _selectedLocation!.latitude,
       longitude: _selectedLocation!.longitude,
       status: 'available',
-      createdAt: DateTime.now(), // will be overwritten in Firestore with serverTimestamp
+      createdAt: DateTime.now(),
     );
 
     try {
@@ -252,9 +359,6 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       body: _showLocationScreen ? _buildLocationScreen() : _buildFormScreen(),
     );
   }
-
-  // ---------- UI BELOW (same as yours) ----------
-  // Kept your UI as-is for form + location screen.
 
   Widget _buildFormScreen() {
     return Container(
@@ -368,9 +472,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
               onPressed: _selectDate,
               icon: const Icon(Icons.calendar_today),
               label: Text(
-                _selectedDate == null
-                    ? 'Select Date'
-                    : '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}',
+                _selectedDate == null ? 'Select Date' : '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}',
               ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF7A2B93),
@@ -436,8 +538,11 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
               children: [
                 const Text('Pin Your Location', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                Text('Tap on the map to set your exact location',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[600]), textAlign: TextAlign.center),
+                Text(
+                  'Tap on the map to set your exact location',
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                  textAlign: TextAlign.center,
+                ),
               ],
             ),
           ),
@@ -447,10 +552,14 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
               child: Stack(
                 children: [
                   GoogleMap(
-                    initialCameraPosition: const CameraPosition(
-                      target: LatLng(5.3479, 100.2878),
+                    initialCameraPosition: CameraPosition(
+                      target: _usmCenter,
                       zoom: 16,
                     ),
+                    cameraTargetBounds: CameraTargetBounds(
+                      _boundsFromCenter(_usmCenter, _usmRadiusMeters),
+                    ),
+                    minMaxZoomPreference: const MinMaxZoomPreference(15, 20),
                     onMapCreated: (controller) {
                       _mapController = controller;
                       _isMapCreated = true;
@@ -459,7 +568,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                         if (mounted && _isMapCreated) _getCurrentLocation();
                       });
                     },
-                    onTap: (pos) => setState(() => _selectedLocation = pos),
+                    onTap: _onTapMapRestricted,
                     markers: _selectedLocation != null
                         ? {
                             Marker(
@@ -469,6 +578,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                             ),
                           }
                         : {},
+                    circles: _usmCircles,
                     myLocationEnabled: true,
                     myLocationButtonEnabled: false,
                     zoomControlsEnabled: false,

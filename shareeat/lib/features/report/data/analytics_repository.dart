@@ -52,7 +52,11 @@ class AnalyticsRepository {
     if (qty <= 0) continue;
 
     final isHalal = data['isHalal'] == true;
-    if (isHalal) halal++; else nonHalal++;
+    if (isHalal) {
+      halal++;
+    } else {
+      nonHalal++;
+    }
   }
 
   return {
