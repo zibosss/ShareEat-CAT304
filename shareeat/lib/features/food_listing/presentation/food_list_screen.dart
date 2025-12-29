@@ -1,14 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-// -----------------------------------------------------------------------------
-// IMPORTANT: Check these imports!
-// 1. Use VS Code "Quick Fix" (Ctrl + .) if the paths below show red lines.
-// 2. Ensure the last import matches exactly what you named your detail file.
-// -----------------------------------------------------------------------------
 import '../data/food_repository.dart';
 import '../data/models/food_model.dart';
-import 'booking_detail_screen.dart';
 
 enum HalalFilter { all, halal, nonHalal }
 enum DateSort { newest, oldest }
@@ -264,7 +258,7 @@ class FoodListScreenState extends State<FoodListScreen> {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(30),
                     border:
-                        Border.all(color: Colors.black.withOpacity(0.2)),
+                        Border.all(color: Colors.black.withValues(alpha: 0.2)),
                   ),
                   child: TextField(
                     controller: _searchController,
@@ -284,17 +278,17 @@ class FoodListScreenState extends State<FoodListScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF7A2B93).withOpacity(0.12),
+                    color: const Color(0xFF7A2B93).withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: const Color(0xFF7A2B93).withOpacity(0.35),
+                      color: const Color(0xFF7A2B93).withValues(alpha: 0.35),
                     ),
                   ),
                   child: const Icon(
                     Icons.filter_list,
                     color: Color(0xFF7A2B93),
                   ),
-                ),
+                ), 
               )
             ],
           ),
@@ -371,22 +365,7 @@ class FoodListScreenState extends State<FoodListScreen> {
                   ),
                   itemCount: filtered.length,
                   itemBuilder: (context, index) {
-                    final foodItem = filtered[index];
-                    
-                    // --- NAVIGATION WRAPPER ---
-                    return GestureDetector(
-                      behavior: HitTestBehavior.translucent, // Ensures the whole area is clickable
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            // Ensure BookingDetailScreen matches your class name in booking_detail.dart
-                            builder: (context) => BookingDetailScreen(food: foodItem),
-                          ),
-                        );
-                      },
-                      child: _FoodCard(food: foodItem),
-                    );
+                    return _FoodCard(food: filtered[index]);
                   },
                 ),
               );
@@ -419,7 +398,7 @@ class _FoodCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -448,7 +427,7 @@ class _FoodCard extends StatelessWidget {
                         width: double.infinity,
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) {
-                          return const Center(
+                          return const Center(  
                             child: Icon(Icons.image,
                                 size: 50, color: Colors.grey),
                           );
