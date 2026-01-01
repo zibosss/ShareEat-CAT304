@@ -1,30 +1,41 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shareeat/features/food_listing/data/models/food_model.dart'; // ✅ Ensure path is correct
+import 'package:shareeat/features/food_listing/data/models/food_model.dart';
 
 class FoodRepository {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> get _foods => _db.collection('foods');
 
-  /// Real-time feed (Hides items with 0 quantity)
+  final now = Timestamp.fromDate(DateTime.now());
   Stream<List<FoodModel>> watchAvailableFoods() {
     return _foods
         .where('status', isEqualTo: 'available')
-        
-        // ✅ NEW FILTER: Only show food with quantity > 0
-        .where('quantityAvailable', isGreaterThan: 0) 
-        
-        // ⚠️ FIRESTORE RULE: 
-        // When using a range filter (> 0), you must order by that field first.
-        .orderBy('quantityAvailable', descending: true) 
+        .where('quantityAvailable', isGreaterThan: 0)
+        .where('expiryDate', isGreaterThanOrEqualTo: now)
+        .orderBy('expiryDate')
+        .orderBy('quantityAvailable', descending: true)
         .orderBy('createdAt', descending: true)
-        
         .snapshots()
         .map((snap) => snap.docs.map(FoodModel.fromDoc).toList());
   }
 
-  /// Add new food
+  Stream<List<FoodModel>> watchMyFoods(String ownerId) {
+    return _foods
+        .where('ownerId', isEqualTo: ownerId)
+        .where('expiryDate', isGreaterThanOrEqualTo: now)
+        .orderBy('expiryDate')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs.map(FoodModel.fromDoc).toList());
+  }
+
+  /// ✅ Add new food
   Future<void> addFood(FoodModel food) async {
-    await _foods.add(food.toJson());
+    await _foods.add(food.toCreateJson());
+  }
+
+  /// ✅ Update existing food
+  Future<void> updateFood(FoodModel food) async {
+    await _foods.doc(food.id).update(food.toUpdateJson());
   }
 }

@@ -18,7 +18,6 @@ class FoodModel {
   final double latitude;
   final double longitude;
 
-  /// "available" only for now (later can add reserved/completed)
   final String status;
 
   final DateTime createdAt;
@@ -39,7 +38,8 @@ class FoodModel {
     required this.createdAt,
   });
 
-  Map<String, dynamic> toJson() {
+  /// ✅ CREATE only (keeps createdAt as server time)
+  Map<String, dynamic> toCreateJson() {
     return {
       'ownerId': ownerId,
       'title': title,
@@ -52,8 +52,57 @@ class FoodModel {
       'latitude': latitude,
       'longitude': longitude,
       'status': status,
-      'createdAt': FieldValue.serverTimestamp(), // important
+      'createdAt': FieldValue.serverTimestamp(),
     };
+  }
+
+  /// ✅ UPDATE only (does not overwrite createdAt)
+  Map<String, dynamic> toUpdateJson() {
+    return {
+      'title': title,
+      'description': description,
+      'quantity': quantity,
+      'quantityAvailable': quantityAvailable,
+      'expiryDate': Timestamp.fromDate(expiryDate),
+      'isHalal': isHalal,
+      'imageUrl': imageUrl,
+      'latitude': latitude,
+      'longitude': longitude,
+      'status': status,
+    };
+  }
+
+  /// ✅ Needed for editing
+  FoodModel copyWith({
+    String? id,
+    String? ownerId,
+    String? title,
+    String? description,
+    int? quantity,
+    int? quantityAvailable,
+    DateTime? expiryDate,
+    bool? isHalal,
+    String? imageUrl,
+    double? latitude,
+    double? longitude,
+    String? status,
+    DateTime? createdAt,
+  }) {
+    return FoodModel(
+      id: id ?? this.id,
+      ownerId: ownerId ?? this.ownerId,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      quantity: quantity ?? this.quantity,
+      quantityAvailable: quantityAvailable ?? this.quantityAvailable,
+      expiryDate: expiryDate ?? this.expiryDate,
+      isHalal: isHalal ?? this.isHalal,
+      imageUrl: imageUrl ?? this.imageUrl,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
+    );
   }
 
   factory FoodModel.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {

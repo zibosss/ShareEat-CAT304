@@ -14,7 +14,9 @@ import '../data/food_repository.dart';
 import '../data/models/food_model.dart';
 
 class AddFoodScreen extends StatefulWidget {
-  const AddFoodScreen({super.key});
+  final FoodModel? food; // ✅ null = add, not null = edit
+
+  const AddFoodScreen({super.key, this.food});
 
   @override
   State<AddFoodScreen> createState() => _AddFoodScreenState();
@@ -29,6 +31,8 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
   final TextEditingController _otherQuantityController = TextEditingController();
 
   File? _selectedImage;
+  String? _existingImageUrl; // ✅ for edit preview if no new image picked
+
   int _selectedQuantity = 1;
   bool _isOtherQuantity = false;
   bool _isHalal = true;
@@ -42,11 +46,11 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
   bool _showLocationScreen = false;
   bool _isLoadingLocation = true;
 
-  // ===================== USM RADIUS (IMPORTANT) =====================
-  final LatLng _usmCenter = const LatLng(5.3574, 100.2987); 
-  final double _usmRadiusMeters = 1500;  
+  bool get _isEdit => widget.food != null;
+
+  final LatLng _usmCenter = const LatLng(5.3574, 100.2987);
+  final double _usmRadiusMeters = 1500;
   Set<Circle> _usmCircles = {};
-  // ================================================================
 
   @override
   void initState() {
@@ -62,6 +66,27 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
         fillColor: const Color(0xFF7A2B93).withOpacity(0.12),
       ),
     };
+
+    // ✅ Prefill if edit mode
+    final food = widget.food;
+    if (food != null) {
+      _titleController.text = food.title;
+      _descriptionController.text = food.description;
+      _isHalal = food.isHalal;
+      _selectedDate = food.expiryDate;
+      _selectedLocation = LatLng(food.latitude, food.longitude);
+      _existingImageUrl = food.imageUrl;
+
+      final q = food.quantity;
+      if (q >= 1 && q <= 5) {
+        _selectedQuantity = q;
+        _isOtherQuantity = false;
+        _otherQuantityController.clear();
+      } else {
+        _isOtherQuantity = true;
+        _otherQuantityController.text = q.toString();
+      }
+    }
   }
 
   LatLngBounds _boundsFromCenter(LatLng center, double radiusMeters) {
@@ -120,7 +145,10 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       if (!serviceEnabled) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Please enable location services'), backgroundColor: Colors.red),
+            const SnackBar(
+              content: Text('Please enable location services'),
+              backgroundColor: Colors.red,
+            ),
           );
         }
         setState(() => _isLoadingLocation = false);
@@ -160,7 +188,6 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
 
       if (!mounted) return;
 
-      // ✅ IMPORTANT: block GPS pin outside campus radius
       final dist = Geolocator.distanceBetween(
         _usmCenter.latitude,
         _usmCenter.longitude,
@@ -178,9 +205,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
           ),
         );
 
-        _mapController?.animateCamera(
-          CameraUpdate.newLatLngZoom(_usmCenter, 14),
-        );
+        _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_usmCenter, 14));
         return;
       }
 
@@ -202,13 +227,15 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-    if (image != null) setState(() => _selectedImage = File(image.path));
+    if (image != null) {
+      setState(() => _selectedImage = File(image.path));
+    }
   }
 
-  Future<void> _selectDate() async {
+  Future<void> selectDate() async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().add(const Duration(days: 1)),
+      initialDate: (_selectedDate ?? DateTime.now()).add(const Duration(days: 1)),
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
       builder: (context, child) {
@@ -224,12 +251,12 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     if (picked != null) setState(() => _selectedDate = picked);
   }
 
-  int _getQuantity() {
+  int getQuantity() {
     if (_isOtherQuantity) return int.tryParse(_otherQuantityController.text) ?? 1;
     return _selectedQuantity;
   }
 
-  void _nextToLocation() {
+  void nextToLocation() {
     if (_formKey.currentState!.validate()) {
       if (_selectedDate == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -245,7 +272,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     }
   }
 
-  Future<String?> _uploadImageToStorage({
+  Future<String?> uploadImageToStorage({
     required String uid,
     required File imageFile,
   }) async {
@@ -255,7 +282,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     return task.ref.getDownloadURL();
   }
 
-  Future<void> _submitFood() async {
+  Future<void> _submitOrUpdate() async {
     if (_selectedLocation == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a location on the map'), backgroundColor: Colors.red),
@@ -263,7 +290,6 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       return;
     }
 
-    // ✅ EXTRA SAFETY: don’t allow submit outside radius even if something bypasses UI
     final dist = Geolocator.distanceBetween(
       _usmCenter.latitude,
       _usmCenter.longitude,
@@ -285,49 +311,94 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       return;
     }
 
+    // ✅ If editing, ensure same owner edits it
+    if (_isEdit && widget.food!.ownerId != uid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You are not allowed to edit this item.'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
-    String? imageUrl;
+    // ✅ Keep old image unless user picked new one
+    String? finalImageUrl = _existingImageUrl;
     try {
       if (_selectedImage != null) {
-        imageUrl = await _uploadImageToStorage(uid: uid, imageFile: _selectedImage!);
+        finalImageUrl = await uploadImageToStorage(uid: uid, imageFile: _selectedImage!);
       }
     } catch (e) {
       print('Image upload failed: $e');
     }
 
-    final qty = _getQuantity();
-
-    final food = FoodModel(
-      id: '',
-      ownerId: uid,
-      title: _titleController.text.trim(),
-      description: _descriptionController.text.trim(),
-      quantity: qty,
-      quantityAvailable: qty,
-      expiryDate: _selectedDate!,
-      isHalal: _isHalal,
-      imageUrl: imageUrl,
-      latitude: _selectedLocation!.latitude,
-      longitude: _selectedLocation!.longitude,
-      status: 'available',
-      createdAt: DateTime.now(),
-    );
+    final newQty = getQuantity();
 
     try {
-      await _repository.addFood(food);
-      if (!mounted) return;
+      if (!_isEdit) {
+        // ✅ ADD
+        final food = FoodModel(
+          id: '',
+          ownerId: uid,
+          title: _titleController.text.trim(),
+          description: _descriptionController.text.trim(),
+          quantity: newQty,
+          quantityAvailable: newQty,
+          expiryDate: _selectedDate!,
+          isHalal: _isHalal,
+          imageUrl: finalImageUrl,
+          latitude: _selectedLocation!.latitude,
+          longitude: _selectedLocation!.longitude,
+          status: 'available',
+          createdAt: DateTime.now(),
+        );
 
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Food added successfully!'), backgroundColor: Colors.green),
-      );
-      Navigator.pop(context, true);
+        await _repository.addFood(food);
+
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Food added successfully!'), backgroundColor: Colors.green),
+        );
+        Navigator.pop(context, true);
+      } else {
+        // ✅ EDIT
+        final old = widget.food!;
+
+        // Keep booked amount safe:
+        // booked = old.quantity - old.quantityAvailable
+        final booked = (old.quantity - old.quantityAvailable);
+        int newAvailable = newQty - booked;
+        if (newAvailable < 0) newAvailable = 0;
+
+        // ⚠️ Requires FoodModel.copyWith()
+        final updatedFood = old.copyWith(
+          title: _titleController.text.trim(),
+          description: _descriptionController.text.trim(),
+          quantity: newQty,
+          quantityAvailable: newAvailable,
+          expiryDate: _selectedDate!,
+          isHalal: _isHalal,
+          imageUrl: finalImageUrl,
+          latitude: _selectedLocation!.latitude,
+          longitude: _selectedLocation!.longitude,
+        );
+
+        await _repository.updateFood(updatedFood);
+
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Food updated successfully!'), backgroundColor: Colors.green),
+        );
+        Navigator.pop(context, true);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to add food: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text(_isEdit ? 'Failed to update food: $e' : 'Failed to add food: $e'), backgroundColor: Colors.red),
       );
     }
   }
@@ -354,13 +425,13 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
             }
           },
         ),
-        title: const Text('Share Food', style: TextStyle(color: Colors.white)),
+        title: Text(_isEdit ? 'Edit Food' : 'Share Food', style: const TextStyle(color: Colors.white)),
       ),
-      body: _showLocationScreen ? _buildLocationScreen() : _buildFormScreen(),
+      body: _showLocationScreen ? buildLocationScreen() : buildFormScreen(),
     );
   }
 
-  Widget _buildFormScreen() {
+  Widget buildFormScreen() {
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -384,14 +455,16 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                         borderRadius: BorderRadius.circular(15),
                         child: Image.file(_selectedImage!, fit: BoxFit.cover),
                       )
-                    : Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.add_photo_alternate, size: 50, color: const Color(0xFF7A2B93).withOpacity(0.5)),
-                          const SizedBox(height: 8),
-                          Text('Add Image', style: TextStyle(color: Colors.grey[600], fontSize: 16)),
-                        ],
-                      ),
+                    : (_existingImageUrl != null && _existingImageUrl!.isNotEmpty)
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(15),
+                            child: Image.network(
+                              _existingImageUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => _emptyImagePlaceholder(),
+                            ),
+                          )
+                        : _emptyImagePlaceholder(),
               ),
             ),
             const SizedBox(height: 20),
@@ -443,6 +516,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                     onSelected: (_) => setState(() {
                       _isOtherQuantity = false;
                       _selectedQuantity = i;
+                      _otherQuantityController.clear();
                     }),
                   ),
               ],
@@ -469,7 +543,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
             const Text('Expiry Date', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
             const SizedBox(height: 8),
             OutlinedButton.icon(
-              onPressed: _selectDate,
+              onPressed: selectDate,
               icon: const Icon(Icons.calendar_today),
               label: Text(
                 _selectedDate == null ? 'Select Date' : '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}',
@@ -510,13 +584,13 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
 
             const SizedBox(height: 30),
             ElevatedButton(
-              onPressed: _nextToLocation,
+              onPressed: nextToLocation,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF7A2B93),
                 padding: const EdgeInsets.symmetric(vertical: 15),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              child: const Text('Next', style: TextStyle(fontSize: 16, color: Colors.white)),
+              child: Text(_isEdit ? 'Next (Update Location)' : 'Next', style: const TextStyle(fontSize: 16, color: Colors.white)),
             ),
           ],
         ),
@@ -524,7 +598,18 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     );
   }
 
-  Widget _buildLocationScreen() {
+  Widget _emptyImagePlaceholder() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.add_photo_alternate, size: 50, color: const Color(0xFF7A2B93).withOpacity(0.5)),
+        const SizedBox(height: 8),
+        Text(_isEdit ? 'Change Image (Optional)' : 'Add Image', style: TextStyle(color: Colors.grey[600], fontSize: 16)),
+      ],
+    );
+  }
+
+  Widget buildLocationScreen() {
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -553,7 +638,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                 children: [
                   GoogleMap(
                     initialCameraPosition: CameraPosition(
-                      target: _usmCenter,
+                      target: _selectedLocation ?? _usmCenter,
                       zoom: 16,
                     ),
                     cameraTargetBounds: CameraTargetBounds(
@@ -565,7 +650,15 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                       _isMapCreated = true;
 
                       Future.delayed(const Duration(milliseconds: 500), () {
-                        if (mounted && _isMapCreated) _getCurrentLocation();
+                        if (!mounted || !_isMapCreated) return;
+
+                        // If editing and already has location, keep it
+                        if (_selectedLocation != null) {
+                          _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_selectedLocation!, 16));
+                          setState(() => _isLoadingLocation = false);
+                        } else {
+                          _getCurrentLocation();
+                        }
                       });
                     },
                     onTap: _onTapMapRestricted,
@@ -606,7 +699,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
           Padding(
             padding: const EdgeInsets.all(20),
             child: ElevatedButton(
-              onPressed: _isLoading ? null : _submitFood,
+              onPressed: _isLoading ? null : _submitOrUpdate,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF7A2B93),
                 padding: const EdgeInsets.symmetric(vertical: 15),
@@ -615,7 +708,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
               ),
               child: _isLoading
                   ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('Submit', style: TextStyle(fontSize: 16, color: Colors.white)),
+                  : Text(_isEdit ? 'Update' : 'Submit', style: const TextStyle(fontSize: 16, color: Colors.white)),
             ),
           ),
         ],
