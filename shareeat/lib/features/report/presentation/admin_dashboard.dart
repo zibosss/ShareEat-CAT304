@@ -363,215 +363,248 @@ class _AdminDashboardState extends State<AdminDashboard> {
   // inside _AdminDashboardState in admin_dashboard.dart
 
   Future<void> _openReportDetail(ReportModel r) async {
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-      ),
-      builder: (_) {
-        return Padding(
-          padding:
-              EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+  await showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+    ),
+    builder: (_) {
+      return Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.report, color: purple),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      r.reportType.isEmpty ? "Report detail" : r.reportType,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 8),
+              Text("Reported person: ${r.reportedUsername}"),
+              Text("Reporter: ${r.reporterName}"),
+
+              const SizedBox(height: 12),
+              const Text(
+                "Description",
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              Text(r.description),
+
+              const SizedBox(height: 16),
+
+              // ==========================
+              // ✅ EVIDENCE DISPLAY (IMAGE)
+              // ==========================
+              if (r.evidenceUrl != null && r.evidenceUrl!.isNotEmpty) ...[
+                const Text(
+                  "Evidence attached",
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    r.evidenceUrl!,
+                    height: 200,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return SizedBox(
+                        height: 200,
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            value: (progress.expectedTotalBytes != null)
+                                ? progress.cumulativeBytesLoaded /
+                                    (progress.expectedTotalBytes ?? 1)
+                                : null,
+                          ),
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        height: 200,
+                        width: double.infinity,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text("Failed to load evidence image."),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ] else ...[
+                // Optional message when no evidence
+                const Text(
+                  "No evidence attached.",
+                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              const Divider(),
+              const SizedBox(height: 12),
+
+              // =======================
+              // ACTION BUTTONS
+              // =======================
+              if (r.status == 'banned') ...[
                 Row(
                   children: [
-                    const Icon(Icons.report, color: purple),
-                    const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        r.reportType.isEmpty ? "Report detail" : r.reportType,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      child: OutlinedButton(
+                        onPressed: () async {
+                          await _reportRepo.unbanUserAndRejectReport(
+                            reportId: r.id,
+                            reportedUserUid: r.reportedUserUid,
+                            adminNote:
+                                'Ban reverted – report considered fake / invalid',
+                          );
+
+                          Navigator.pop(context);
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                "User unbanned and report marked as REJECTED.",
+                              ),
+                            ),
+                          );
+                        },
+                        child: const Text("Unban user & reject report"),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text("Reported person: ${r.reportedUsername}"),
-                Text("Reporter: ${r.reporterName}"),
-                const SizedBox(height: 12),
                 const Text(
-                  "Description",
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                  ),
+                  "Use this if you later find the report was fake or incorrect.",
+                  style: TextStyle(fontSize: 12, color: Colors.black54),
                 ),
-                const SizedBox(height: 4),
-                Text(r.description),
-                const SizedBox(height: 16),
-
-                if (r.evidenceUrl != null && r.evidenceUrl!.isNotEmpty)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text(
-                        "Evidence attached",
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        "(For now only URL/flag is stored. You can show the image later.)",
-                        style: TextStyle(fontSize: 12, color: Colors.black54),
-                      ),
-                      SizedBox(height: 16),
-                    ],
-                  ),
-
-                const Divider(),
-                const SizedBox(height: 12),
-
-                // =======================
-                // ACTION BUTTONS
-                // =======================
-                if (r.status == 'banned') ...[
-                  // When the report is already banned:
-                  // 1) Unban user & reject report
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () async {
-                            await _reportRepo.unbanUserAndRejectReport(
-                              reportId: r.id,
-                              reportedUserUid: r.reportedUserUid,
-                              adminNote:
-                                  'Ban reverted – report considered fake / invalid',
-                            );
-
-                            Navigator.pop(context);
-
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  "User unbanned and report marked as REJECTED.",
-                                ),
-                              ),
-                            );
-                          },
-                          child: const Text("Unban user & reject report"),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    "Use this if you later find the report was fake or incorrect.",
-                    style: TextStyle(fontSize: 12, color: Colors.black54),
-                  ),
-                ] else ...[
-                  // Normal flow: Pending / Rejected etc.
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: r.status == 'rejected'
-                              ? null
-                              : () async {
-                                  await _reportRepo.updateReportStatus(
-                                    reportId: r.id,
-                                    status: 'rejected',
-                                    adminNote: 'No action taken',
-                                  );
-                                  Navigator.pop(context);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        "Report marked as 'Do not take action'.",
-                                      ),
+              ] else ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: r.status == 'rejected'
+                            ? null
+                            : () async {
+                                await _reportRepo.updateReportStatus(
+                                  reportId: r.id,
+                                  status: 'rejected',
+                                  adminNote: 'No action taken',
+                                );
+                                Navigator.pop(context);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      "Report marked as 'Do not take action'.",
                                     ),
-                                  );
-                                },
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(
-                              color: r.status == 'rejected'
-                                  ? Colors.grey
-                                  : Colors.grey.shade600,
-                            ),
+                                  ),
+                                );
+                              },
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(
+                            color: r.status == 'rejected'
+                                ? Colors.grey
+                                : Colors.grey.shade600,
                           ),
-                          child: const Text("Do not take action"),
                         ),
+                        child: const Text("Do not take action"),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: r.status == 'banned'
-                              ? null
-                              : () async {
-                                  final confirm = await showDialog<bool>(
-                                    context: context,
-                                    builder: (_) => AlertDialog(
-                                      title: const Text("Ban user"),
-                                      content: Text(
-                                        "Ban ${r.reportedUsername.isEmpty ? 'this user' : r.reportedUsername} from ShareEat?",
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(context, false),
-                                          child: const Text("Cancel"),
-                                        ),
-                                        ElevatedButton(
-                                          onPressed: () =>
-                                              Navigator.pop(context, true),
-                                          child: const Text("Ban"),
-                                        ),
-                                      ],
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: r.status == 'banned'
+                            ? null
+                            : () async {
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (_) => AlertDialog(
+                                    title: const Text("Ban user"),
+                                    content: Text(
+                                      "Ban ${r.reportedUsername.isEmpty ? 'this user' : r.reportedUsername} from ShareEat?",
                                     ),
-                                  );
-
-                                  if (confirm != true) return;
-
-                                  await _reportRepo.banUserAndMarkReport(
-                                    reportId: r.id,
-                                    reportedUserUid: r.reportedUserUid,
-                                    adminNote: 'User banned by admin',
-                                  );
-
-                                  Navigator.pop(context);
-
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      backgroundColor: Colors.red,
-                                      content: Text(
-                                        "User banned and report updated.",
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, false),
+                                        child: const Text("Cancel"),
                                       ),
-                                    ),
-                                  );
-                                },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            foregroundColor: Colors.white,
-                          ),
-                          child: const Text("Ban user & close report"),
+                                      ElevatedButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, true),
+                                        child: const Text("Ban"),
+                                      ),
+                                    ],
+                                  ),
+                                );
+
+                                if (confirm != true) return;
+
+                                await _reportRepo.banUserAndMarkReport(
+                                  reportId: r.id,
+                                  reportedUserUid: r.reportedUserUid,
+                                  adminNote: 'User banned by admin',
+                                );
+
+                                Navigator.pop(context);
+
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    backgroundColor: Colors.red,
+                                    content: Text("User banned and report updated."),
+                                  ),
+                                );
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
                         ),
+                        child: const Text("Ban user & close report"),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    "Banned users will not be able to access ShareEat.",
-                    style: TextStyle(fontSize: 12, color: Colors.black54),
-                  ),
-                ],
-
-                const SizedBox(height: 12),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  "Banned users will not be able to access ShareEat.",
+                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                ),
               ],
-            ),
+
+              const SizedBox(height: 12),
+            ],
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
+
 
 
   // =========================

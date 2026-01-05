@@ -1,9 +1,12 @@
 // lib/features/report/presentation/report_issue_screen.dart
 
+// ignore_for_file: use_build_context_synchronously
+
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart'; // ✅ NEW
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -40,16 +43,14 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
 
   String _selectedType = 'Did not receive food';
 
-  final TextEditingController _descriptionController =
-      TextEditingController();
-
+  final TextEditingController _descriptionController = TextEditingController();
   bool _isSubmitting = false;
 
-  // evidence image
+  // Evidence image
   Uint8List? _evidenceBytes;
   String? _evidenceName;
 
-  // reported user (donor)
+  // Reported user info
   final UserRepository _userRepo = UserRepository();
   AppUser? _reportedUser;
   bool _isLoadingReportedUser = true;
@@ -70,9 +71,7 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _isLoadingReportedUser = false;
-      });
+      setState(() => _isLoadingReportedUser = false);
     }
   }
 
@@ -94,6 +93,31 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
     });
   }
 
+  /// ✅ Upload evidence to Firebase Storage and return download URL
+  Future<String?> _uploadEvidenceToStorage(String reportId) async {
+    if (_evidenceBytes == null) return null;
+
+    // Create a unique file name (use original name if available)
+    final filename = (_evidenceName != null && _evidenceName!.trim().isNotEmpty)
+        ? _evidenceName!.trim()
+        : 'evidence.jpg';
+
+    final ref = FirebaseStorage.instance
+        .ref()
+        .child('report_evidence')
+        .child(reportId)
+        .child(filename);
+
+    // Upload bytes
+    await ref.putData(
+      _evidenceBytes!,
+      SettableMetadata(contentType: 'image/jpeg'),
+    );
+
+    // Get download URL
+    return await ref.getDownloadURL();
+  }
+
   Future<void> _submitReport() async {
     if (_descriptionController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -106,32 +130,34 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
 
     try {
       final authUser = FirebaseAuth.instance.currentUser;
-
       final reporterEmail = authUser?.email ?? '';
-      final reporterUid = widget.reporterId;
-      // ignore: unused_local_variable
-      final reporterName = reporterEmail; // or use stored full name if you have it
-      // ignore: unused_local_variable
-      final reportedUsername = _reportedUser?.fullName ?? '';
 
-      final reportsRef =
-          FirebaseFirestore.instance.collection('reports');
+      final reportsRef = FirebaseFirestore.instance.collection('reports');
 
-      await reportsRef.add({
+      // ✅ Use doc() so we have reportId before upload
+      final reportDoc = reportsRef.doc();
+      final reportId = reportDoc.id;
+
+      // ✅ Upload evidence first (if any)
+      final String? evidenceUrl = await _uploadEvidenceToStorage(reportId);
+
+      // ✅ Save report to Firestore with evidenceUrl
+      await reportDoc.set({
         'bookingId': widget.bookingId,
         'foodTitle': widget.foodTitle,
-        'reportType': _selectedType,                     // rename 'type' → 'reportType'
+        'reportType': _selectedType,
         'description': _descriptionController.text.trim(),
-        'reporterUid': reporterUid,
-        'reporterName': reporterEmail,                   // or a nicer name if you have it
-        'reportedUserUid': widget.reportedUserId,        // 👈 important
+        'reporterUid': widget.reporterId,
+        'reporterName': reporterEmail,
+        'reportedUserUid': widget.reportedUserId,
         'reportedUsername': _reportedUser?.fullName ?? '',
         'createdAt': FieldValue.serverTimestamp(),
         'status': 'pending',
-        'hasEvidence': _evidenceBytes != null,
+
+        // Evidence fields
+        'hasEvidence': evidenceUrl != null,
+        'evidenceUrl': evidenceUrl, // ✅ this is what admin will display
       });
-
-
 
       if (!mounted) return;
 
@@ -152,16 +178,13 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
         ),
       );
     } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-      }
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final reporterEmail =
-        FirebaseAuth.instance.currentUser?.email ?? '';
+    final reporterEmail = FirebaseAuth.instance.currentUser?.email ?? '';
     const purple = Color(0xFF7A2B93);
 
     return Scaffold(
@@ -177,15 +200,11 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
       ),
       body: Column(
         children: [
-          // Header line under app bar – centred RichText
           Container(
             width: double.infinity,
             color: Colors.white,
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: const Center(
-              child: _SafetyHeaderText(),
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: const Center(child: _SafetyHeaderText()),
           ),
           Expanded(
             child: SingleChildScrollView(
@@ -193,67 +212,42 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // food title
                   Text(
                     widget.foodTitle,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
 
-                  // Report type label
                   const Text(
                     'Report Type',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
 
-                  // ==== Figma-style symmetric buttons ====
                   LayoutBuilder(
                     builder: (context, constraints) {
                       final double totalWidth = constraints.maxWidth;
                       final double gap = 12;
-                      final double itemWidth =
-                          (totalWidth - gap) / 2; // 2 per row
+                      final double itemWidth = (totalWidth - gap) / 2;
 
                       return Column(
                         children: [
-                          // first row: [0] [1]
                           Row(
                             children: [
-                              _buildReportTypeButton(
-                                label: _reportTypes[0],
-                                width: itemWidth,
-                              ),
+                              _buildReportTypeButton(label: _reportTypes[0], width: itemWidth),
                               SizedBox(width: gap),
-                              _buildReportTypeButton(
-                                label: _reportTypes[1],
-                                width: itemWidth,
-                              ),
+                              _buildReportTypeButton(label: _reportTypes[1], width: itemWidth),
                             ],
                           ),
                           const SizedBox(height: 12),
-                          // second row: [2] [3]
                           Row(
                             children: [
-                              _buildReportTypeButton(
-                                label: _reportTypes[2],
-                                width: itemWidth,
-                              ),
+                              _buildReportTypeButton(label: _reportTypes[2], width: itemWidth),
                               SizedBox(width: gap),
-                              _buildReportTypeButton(
-                                label: _reportTypes[3],
-                                width: itemWidth,
-                              ),
+                              _buildReportTypeButton(label: _reportTypes[3], width: itemWidth),
                             ],
                           ),
                           const SizedBox(height: 12),
-                          // third row: "Other" centred (full width)
                           Align(
                             alignment: Alignment.center,
                             child: _buildReportTypeButton(
@@ -268,19 +262,11 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
 
                   const SizedBox(height: 24),
 
-                  // Username (reporter)
-                  const Text(
-                    'Username',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  const Text('Username', style: TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 4),
                   TextField(
                     readOnly: true,
-                    controller: TextEditingController(
-                      text: reporterEmail,
-                    ),
+                    controller: TextEditingController(text: reporterEmail),
                     decoration: const InputDecoration(
                       isDense: true,
                       border: UnderlineInputBorder(),
@@ -288,20 +274,14 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Who is being reported (donor)
                   const Text(
                     'Reported person (donor)',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 4),
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 12,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                     decoration: BoxDecoration(
                       color: Colors.grey[100],
                       borderRadius: BorderRadius.circular(8),
@@ -314,20 +294,15 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
                               ? _reportedUser!.fullName
                               : 'Unknown user'),
                       style: TextStyle(
-                        color: _isLoadingReportedUser
-                            ? Colors.grey
-                            : Colors.black87,
+                        color: _isLoadingReportedUser ? Colors.grey : Colors.black87,
                       ),
                     ),
                   ),
                   const SizedBox(height: 24),
 
-                  // Description
                   const Text(
                     'Describe what happened',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
                   TextField(
@@ -335,16 +310,14 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
                     maxLines: 5,
                     decoration: InputDecoration(
                       hintText: 'Describe what happened...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       filled: true,
                       fillColor: Colors.white,
                     ),
                   ),
                   const SizedBox(height: 24),
 
-                  // Upload evidence
+                  // Evidence upload UI
                   Center(
                     child: GestureDetector(
                       onTap: _pickEvidence,
@@ -354,10 +327,7 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: Colors.grey.shade400,
-                            style: BorderStyle.solid,
-                          ),
+                          border: Border.all(color: Colors.grey.shade400),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.05),
@@ -369,15 +339,10 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(
-                              Icons.add_photo_alternate_outlined,
-                              size: 40,
-                            ),
+                            const Icon(Icons.add_photo_alternate_outlined, size: 40),
                             const SizedBox(height: 8),
                             Text(
-                              _evidenceName == null
-                                  ? 'Upload evidence'
-                                  : _evidenceName!,
+                              _evidenceName == null ? 'Upload evidence' : _evidenceName!,
                               textAlign: TextAlign.center,
                               style: const TextStyle(fontSize: 13),
                             ),
@@ -386,23 +351,18 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
                       ),
                     ),
                   ),
+
                   const SizedBox(height: 32),
 
-                  // Submit button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed:
-                          _isSubmitting ? null : _submitReport,
+                      onPressed: _isSubmitting ? null : _submitReport,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: purple,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 16,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
-                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                       ),
                       child: _isSubmitting
                           ? const SizedBox(
@@ -410,17 +370,12 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
                               width: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(
-                                        Colors.white),
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                               ),
                             )
                           : const Text(
                               'SUBMIT',
-                              style: TextStyle(
-                                letterSpacing: 1.2,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              style: TextStyle(letterSpacing: 1.2, fontWeight: FontWeight.bold),
                             ),
                     ),
                   ),
@@ -433,7 +388,6 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
     );
   }
 
-  /// Single Figma-style button for report type
   Widget _buildReportTypeButton({
     required String label,
     required double width,
@@ -442,9 +396,7 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
     final bool selected = _selectedType == label;
 
     return GestureDetector(
-      onTap: () {
-        setState(() => _selectedType = label);
-      },
+      onTap: () => setState(() => _selectedType = label),
       child: Container(
         width: width,
         constraints: const BoxConstraints(minHeight: 60),
@@ -477,7 +429,6 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
   }
 }
 
-/// Centered “Help us keep SharEat safe…” text with purple highlight
 class _SafetyHeaderText extends StatelessWidget {
   const _SafetyHeaderText();
 
@@ -486,10 +437,7 @@ class _SafetyHeaderText extends StatelessWidget {
     return RichText(
       textAlign: TextAlign.center,
       text: const TextSpan(
-        style: TextStyle(
-          fontSize: 13,
-          color: Colors.black87,
-        ),
+        style: TextStyle(fontSize: 13, color: Colors.black87),
         children: [
           TextSpan(text: 'Help us keep '),
           TextSpan(
