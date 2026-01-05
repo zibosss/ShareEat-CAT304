@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart'; 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -26,8 +27,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   AppUser? _donor;
   bool _isLoadingDonor = true;
 
-  // ✅ STATE FOR QUANTITY SELECTION
-  int _requestQty = 1; 
+  int _requestQty = 1;
 
   @override
   void initState() {
@@ -36,8 +36,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     _loadDonorInfo();
   }
 
-  void _setMarker() { /* ... keep existing code ... */ 
-      setState(() {
+  void _setMarker() {
+    setState(() {
       _markers.add(
         Marker(
           markerId: MarkerId(widget.food.id),
@@ -49,7 +49,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     });
   }
 
-  Future<void> _loadDonorInfo() async { /* ... keep existing code ... */ 
+  Future<void> _loadDonorInfo() async {
     try {
       AppUser? donor = await _userRepo.getUserById(widget.food.ownerId);
       if (mounted) {
@@ -63,14 +63,12 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     }
   }
 
-  // ✅ INCREMENT FUNCTION
   void _incrementQty() {
     if (_requestQty < widget.food.quantityAvailable) {
       setState(() => _requestQty++);
     }
   }
 
-  // ✅ DECREMENT FUNCTION
   void _decrementQty() {
     if (_requestQty > 1) {
       setState(() => _requestQty--);
@@ -89,7 +87,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         children: [
           CustomScrollView(
             slivers: [
-              // 1. APP BAR (Keep same)
+              // 1. APP BAR
               SliverAppBar(
                 expandedHeight: 280,
                 pinned: true,
@@ -116,10 +114,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                       Text(widget.food.title, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
                       Text("Posted on ${dateFormat.format(widget.food.createdAt)}", style: TextStyle(color: Colors.grey[600], fontSize: 13)),
-                      
                       const SizedBox(height: 20),
 
-                      // Info Badges (Halal, Stock, Expiry) - Keep existing code...
+                      // Info Badges
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
@@ -137,7 +134,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                       const Divider(),
                       const SizedBox(height: 20),
 
-                      // ✅ QUANTITY SELECTOR
+                      // Quantity Selector
                       if (!isOutOfStock) ...[
                         const Text("Select Quantity", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 10),
@@ -162,22 +159,33 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                         const SizedBox(height: 20),
                       ],
 
-                      // Description
                       const Text("Description", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 10),
                       Text(widget.food.description, style: TextStyle(fontSize: 15, height: 1.5, color: Colors.grey[800])),
 
                       const SizedBox(height: 25),
 
-                      // Donor Info & Map (Keep existing...)
                       const Text("Donor Information", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 10),
                       _buildDonorInfo(),
                       
                       const SizedBox(height: 25),
+                      
+                      // LOCATION MAP FEATURE
                       const Text("Pickup Location", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 10),
-                      SizedBox(height: 200, child: ClipRRect(borderRadius: BorderRadius.circular(15), child: GoogleMap(initialCameraPosition: CameraPosition(target: LatLng(widget.food.latitude, widget.food.longitude), zoom: 15), markers: _markers, zoomControlsEnabled: false, onMapCreated: (c) => _controller.complete(c)))),
+                      SizedBox(
+                        height: 200, 
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(15), 
+                          child: GoogleMap(
+                            initialCameraPosition: CameraPosition(target: LatLng(widget.food.latitude, widget.food.longitude), zoom: 15), 
+                            markers: _markers, 
+                            zoomControlsEnabled: false, 
+                            onMapCreated: (c) => _controller.complete(c)
+                          )
+                        )
+                      ),
                       
                       const SizedBox(height: 120),
                     ],
@@ -208,7 +216,6 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     );
   }
 
-  // Helper for Badges
   Widget _buildBadge(String text, Color color, IconData icon) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -217,7 +224,6 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     );
   }
 
-  // Helper for Donor
   Widget _buildDonorInfo() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -226,12 +232,54 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     );
   }
 
-  // ✅ NEW REQUEST HANDLER
+  // ----------- MODIFIED FUNCTION BELOW -----------
   Future<void> _handleRequest() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please login"))); return; }
-    if (user.uid == widget.food.ownerId) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Cannot request own food"))); return; }
+    if (user == null) { 
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please login"))); 
+      return; 
+    }
+    if (user.uid == widget.food.ownerId) { 
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Cannot request own food"))); 
+      return; 
+    }
 
+    // --- CHECK LIMIT LOGIC ---
+    try {
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('bookings') 
+          .where('requesterId', isEqualTo: user.uid)
+          .where('status', isEqualTo: 'pending') 
+          .get();
+
+      int currentPendingItems = 0;
+      for (var doc in querySnapshot.docs) {
+        final data = doc.data();
+        int qty = 1;
+        if (data.containsKey('quantity')) {
+           qty = data['quantity'];
+        }
+        currentPendingItems += qty;
+      }
+
+      if (currentPendingItems + _requestQty > 3) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: Colors.red,
+              content: Text(
+                "Limit Reached! You have $currentPendingItems active items. Max allowed is 3.",
+              ),
+            ),
+          );
+        }
+        return; 
+      }
+    } catch (e) {
+      print("Error checking limit: $e");
+    }
+
+    // --- CREATE BOOKING WITH LOCATION ---
     final newBooking = BookingModel(
       id: '',
       foodId: widget.food.id,
@@ -242,7 +290,11 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       status: 'pending',
       qrCodeData: "SE-${user.uid.substring(0, 5)}-${DateTime.now().millisecondsSinceEpoch}",
       createdAt: DateTime.now(),
-      quantity: _requestQty, // ✅ PASS CHOSEN QUANTITY
+      quantity: _requestQty,
+      
+      // ✅ ADDED THESE TWO LINES
+      latitude: widget.food.latitude,
+      longitude: widget.food.longitude,
     );
 
     try {

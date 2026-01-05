@@ -8,7 +8,6 @@ import 'booking_detail_screen.dart';
 import 'add_food_screen.dart';
 
 enum HalalFilter { all, halal, nonHalal }
-
 enum DateSort { newest, oldest }
 
 class FoodListScreen extends StatefulWidget {
@@ -65,9 +64,8 @@ class FoodListScreenState extends State<FoodListScreen>
   }
 
   List<FoodModel> _applyFilters(List<FoodModel> foods) {
-    final filtered = foods
-        .where((f) => _matchSearch(f) && _matchHalal(f))
-        .toList();
+    final filtered =
+        foods.where((f) => _matchSearch(f) && _matchHalal(f)).toList();
 
     filtered.sort((a, b) {
       return _dateSort == DateSort.newest
@@ -218,6 +216,27 @@ class FoodListScreenState extends State<FoodListScreen>
     );
   }
 
+  Future<bool?> _confirmDelete() {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete food?'),
+        content: const Text('This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final chipsText = '${_halalLabel(_halalFilter)} • ${_dateLabel(_dateSort)}';
@@ -246,14 +265,12 @@ class FoodListScreenState extends State<FoodListScreen>
                   child: TextField(
                     controller: _searchController,
                     onChanged: _searchFoods,
-                    textAlignVertical: TextAlignVertical.center, 
+                    textAlignVertical: TextAlignVertical.center,
                     decoration: InputDecoration(
                       border: InputBorder.none,
                       hintText: "Search food...",
-                      isDense: true, 
-                      contentPadding: const EdgeInsets.symmetric(
-                        vertical: 12,
-                      ), 
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
                       prefixIcon: const Icon(Icons.search),
                       prefixIconConstraints: const BoxConstraints(
                         minHeight: 24,
@@ -305,7 +322,7 @@ class FoodListScreenState extends State<FoodListScreen>
 
         const SizedBox(height: 10),
 
-        // ✅ Tabs
+        // Tabs
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Container(
@@ -352,7 +369,7 @@ class FoodListScreenState extends State<FoodListScreen>
           child: TabBarView(
             controller: _tabController,
             children: [
-              // ===== TAB 1: ALL FOODS =====
+              // All Foods
               StreamBuilder<List<FoodModel>>(
                 stream: _foodRepo.watchAvailableFoods(),
                 builder: (context, snapshot) {
@@ -364,7 +381,7 @@ class FoodListScreenState extends State<FoodListScreen>
                 },
               ),
 
-              // ===== TAB 2: MY FOODS =====
+              // My Foods
               if (uid == null)
                 const Center(child: Text('Please login to view your foods'))
               else
@@ -449,12 +466,27 @@ class FoodListScreenState extends State<FoodListScreen>
             },
             child: _FoodCard(
               food: foodItem,
-              showEdit: isMyFoodsTab, // ✅ edit only in My Foods tab
+              showEdit: isMyFoodsTab,
               onEdit: () async {
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => AddFoodScreen(food: foodItem),
+                  ),
+                );
+              },
+              showDelete: isMyFoodsTab,
+              onDelete: () async {
+                final ok = await _confirmDelete();
+                if (ok != true) return;
+
+                await _foodRepo.deleteFood(foodItem.id);
+
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Food deleted'),
+                    backgroundColor: Colors.green,
                   ),
                 );
               },
@@ -475,10 +507,20 @@ class FoodListScreenState extends State<FoodListScreen>
 
 class _FoodCard extends StatelessWidget {
   final FoodModel food;
+
   final bool showEdit;
   final VoidCallback? onEdit;
 
-  const _FoodCard({required this.food, this.showEdit = false, this.onEdit});
+  final bool showDelete;
+  final VoidCallback? onDelete;
+
+  const _FoodCard({
+    required this.food,
+    this.showEdit = false,
+    this.onEdit,
+    this.showDelete = false,
+    this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -604,22 +646,46 @@ class _FoodCard extends StatelessWidget {
           ),
         ),
 
-        // ✅ edit button overlay (only in My Foods tab)
-        if (showEdit)
+        // Delete + Edit (only My Foods tab)
+        if (showEdit || showDelete)
           Positioned(
             top: 8,
             right: 8,
-            child: Material(
-              color: Colors.white.withValues(alpha: 0.9),
-              borderRadius: BorderRadius.circular(10),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(10),
-                onTap: onEdit,
-                child: const Padding(
-                  padding: EdgeInsets.all(6),
-                  child: Icon(Icons.edit, size: 18, color: Color(0xFF7A2B93)),
-                ),
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (showDelete)
+                  Material(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    borderRadius: BorderRadius.circular(10),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: onDelete,
+                      child: const Padding(
+                        padding: EdgeInsets.all(6),
+                        child: Icon(Icons.delete, size: 18, color: Colors.red),
+                      ),
+                    ),
+                  ),
+                if (showDelete && showEdit) const SizedBox(width: 6),
+                if (showEdit)
+                  Material(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    borderRadius: BorderRadius.circular(10),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: onEdit,
+                      child: const Padding(
+                        padding: EdgeInsets.all(6),
+                        child: Icon(
+                          Icons.edit,
+                          size: 18,
+                          color: Color(0xFF7A2B93),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
       ],

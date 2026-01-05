@@ -1,5 +1,3 @@
-// TODO Implement this library.
-// TODO Implement this library.
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class BookingModel {
@@ -9,8 +7,14 @@ class BookingModel {
   final String? foodImage;
   final String requesterId;
   final String ownerId;
-  final String status; // e.g., 'pending', 'accepted', 'rejected'
+  final String status;
+  final String qrCodeData;
   final DateTime createdAt;
+  final int quantity;
+  
+  // ✅ NEW FIELDS: Location Data
+  final double latitude;
+  final double longitude;
 
   BookingModel({
     required this.id,
@@ -20,7 +24,13 @@ class BookingModel {
     required this.requesterId,
     required this.ownerId,
     required this.status,
+    required this.qrCodeData,
     required this.createdAt,
+    required this.quantity,
+    
+    // ✅ REQUIRED in Constructor
+    required this.latitude,
+    required this.longitude,
   });
 
   Map<String, dynamic> toJson() {
@@ -31,7 +41,13 @@ class BookingModel {
       'requesterId': requesterId,
       'ownerId': ownerId,
       'status': status,
+      'qrCodeData': qrCodeData,
       'createdAt': FieldValue.serverTimestamp(),
+      'quantity': quantity,
+      
+      // ✅ SAVE TO DB
+      'latitude': latitude,
+      'longitude': longitude,
     };
   }
 
@@ -41,11 +57,17 @@ class BookingModel {
       id: doc.id,
       foodId: data['foodId'] ?? '',
       foodTitle: data['foodTitle'] ?? '',
-      foodImage: data['foodImage'],
+      foodImage: data['foodImage'] as String?,
       requesterId: data['requesterId'] ?? '',
       ownerId: data['ownerId'] ?? '',
       status: data['status'] ?? 'pending',
+      qrCodeData: data['qrCodeData'] ?? '',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      quantity: data['quantity'] ?? 1,
+      
+      // ✅ READ FROM DB (Handles both int and double safely)
+      latitude: (data['latitude'] ?? 0.0).toDouble(),
+      longitude: (data['longitude'] ?? 0.0).toDouble(),
     );
   }
 }

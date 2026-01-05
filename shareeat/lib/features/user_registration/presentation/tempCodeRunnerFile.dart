@@ -14,12 +14,14 @@ class TempLoginHelper extends StatefulWidget {
 
 class _TempLoginHelperState extends State<TempLoginHelper> {
   final _formKey = GlobalKey<FormState>();
+  // ignore: unused_field
   bool _isLoading = false;
 
   final UserRepository _userRepo = UserRepository();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
+  // ignore: unused_element
   Future<void> _onLoginPressed() async {
     if (!_formKey.currentState!.validate()) return;
 

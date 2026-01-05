@@ -29,13 +29,18 @@ class FoodRepository {
         .map((snap) => snap.docs.map(FoodModel.fromDoc).toList());
   }
 
-  /// ✅ Add new food
+  
   Future<void> addFood(FoodModel food) async {
     await _foods.add(food.toCreateJson());
   }
 
-  /// ✅ Update existing food
+  
   Future<void> updateFood(FoodModel food) async {
     await _foods.doc(food.id).update(food.toUpdateJson());
   }
+
+  Future<void> deleteFood(String foodId) async {
+  await _foods.doc(foodId).delete();
+}
+
 }

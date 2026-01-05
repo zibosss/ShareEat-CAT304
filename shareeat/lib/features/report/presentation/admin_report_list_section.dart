@@ -20,6 +20,7 @@ class _AdminReportListSectionState extends State<AdminReportListSection> {
 
   @override
   Widget build(BuildContext context) {
+    // ignore: unused_local_variable
     const purple = Color(0xFF7A2B93);
 
     return Column(

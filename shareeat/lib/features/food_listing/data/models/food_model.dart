@@ -38,7 +38,7 @@ class FoodModel {
     required this.createdAt,
   });
 
-  /// ✅ CREATE only (keeps createdAt as server time)
+  
   Map<String, dynamic> toCreateJson() {
     return {
       'ownerId': ownerId,
@@ -56,7 +56,7 @@ class FoodModel {
     };
   }
 
-  /// ✅ UPDATE only (does not overwrite createdAt)
+  
   Map<String, dynamic> toUpdateJson() {
     return {
       'title': title,
@@ -72,7 +72,7 @@ class FoodModel {
     };
   }
 
-  /// ✅ Needed for editing
+  
   FoodModel copyWith({
     String? id,
     String? ownerId,

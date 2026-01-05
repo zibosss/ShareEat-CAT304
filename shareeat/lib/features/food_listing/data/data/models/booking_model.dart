@@ -10,7 +10,11 @@ class BookingModel {
   final String status;
   final String qrCodeData;
   final DateTime createdAt;
-  final int quantity; // ✅ NEW FIELD
+  final int quantity;
+  
+  // ✅ NEW FIELDS: Location Data
+  final double latitude;
+  final double longitude;
 
   BookingModel({
     required this.id,
@@ -22,7 +26,11 @@ class BookingModel {
     required this.status,
     required this.qrCodeData,
     required this.createdAt,
-    required this.quantity, // ✅ REQUIRED
+    required this.quantity,
+    
+    // ✅ REQUIRED in Constructor
+    required this.latitude,
+    required this.longitude,
   });
 
   Map<String, dynamic> toJson() {
@@ -35,7 +43,11 @@ class BookingModel {
       'status': status,
       'qrCodeData': qrCodeData,
       'createdAt': FieldValue.serverTimestamp(),
-      'quantity': quantity, // ✅ SAVE TO DB
+      'quantity': quantity,
+      
+      // ✅ SAVE TO DB
+      'latitude': latitude,
+      'longitude': longitude,
     };
   }
 
@@ -51,7 +63,11 @@ class BookingModel {
       status: data['status'] ?? 'pending',
       qrCodeData: data['qrCodeData'] ?? '',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      quantity: data['quantity'] ?? 1, // ✅ READ FROM DB
+      quantity: data['quantity'] ?? 1,
+      
+      // ✅ READ FROM DB (Handles both int and double safely)
+      latitude: (data['latitude'] ?? 0.0).toDouble(),
+      longitude: (data['longitude'] ?? 0.0).toDouble(),
     );
   }
 }

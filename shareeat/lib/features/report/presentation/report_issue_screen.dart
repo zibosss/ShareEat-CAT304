@@ -109,7 +109,9 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
 
       final reporterEmail = authUser?.email ?? '';
       final reporterUid = widget.reporterId;
+      // ignore: unused_local_variable
       final reporterName = reporterEmail; // or use stored full name if you have it
+      // ignore: unused_local_variable
       final reportedUsername = _reportedUser?.fullName ?? '';
 
       final reportsRef =

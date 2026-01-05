@@ -29,7 +29,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   // all | pending | rejected | banned
   String _statusFilter = 'all';
 
-  int _trendDays = 7; // 7 or 30
+  int _trendDays = 7; 
 
   @override
   Widget build(BuildContext context) {
@@ -228,7 +228,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     return InkWell(
       borderRadius: BorderRadius.circular(18),
       onTap: () => _openReportDetail(r),
-      splashColor: purple.withOpacity(0.08),
+      splashColor: purple.withValues(alpha:0.08),
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
@@ -236,7 +236,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: Colors.black.withValues(alpha:0.03),
               blurRadius: 6,
               offset: const Offset(0, 2),
             ),
@@ -246,7 +246,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           children: [
             CircleAvatar(
               radius: 22,
-              backgroundColor: purple.withOpacity(0.12),
+              backgroundColor: purple.withValues(alpha:0.12),
               child: const Icon(Icons.report_gmailerrorred, color: purple),
             ),
             const SizedBox(width: 12),
@@ -687,7 +687,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             const SizedBox(height: 16),
 
             _foodsTrendCard(trend),
-
+/*
             const SizedBox(height: 24),
 
             const Text(
@@ -712,7 +712,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   ),
                 ),
               ),
-            ),
+            ),*/
 
             const SizedBox(height: 24),
 
