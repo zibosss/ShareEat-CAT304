@@ -26,11 +26,19 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   final _userRepo = UserRepository();
 
-  // Profile image bytes
   Uint8List? _profileImageBytes;
-
-  // Gender value
   String? _selectedGender;
+
+  @override
+  void dispose() {
+    usernameController.dispose();
+    passwordController.dispose();
+    confirmPasswordController.dispose();
+    fullNameController.dispose();
+    phoneController.dispose();
+    emailController.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickImage() async {
     final ImagePicker picker = ImagePicker();
@@ -38,8 +46,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
     if (file != null) {
       final bytes = await file.readAsBytes();
+      if (!mounted) return;
       setState(() => _profileImageBytes = bytes);
     }
+  }
+
+  void _goToLogin() {
+    if (_isLoading) return;
+    Navigator.pushReplacementNamed(context, '/login');
   }
 
   @override
@@ -54,7 +68,40 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const SizedBox(height: 20),
+                const SizedBox(height: 10),
+
+                // ✅ Clean top link
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        "Already have an account? ",
+                        style: TextStyle(fontSize: 13, color: Colors.black54),
+                      ),
+                      TextButton(
+                        onPressed: _isLoading ? null : _goToLogin,
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          minimumSize: const Size(0, 0),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text(
+                          "Log in",
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF7A2B93),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
                 const Text(
                   "Register Here",
                   style: TextStyle(
@@ -71,14 +118,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 ),
                 const SizedBox(height: 30),
 
-                // Profile Picture Picker
                 GestureDetector(
-                  onTap: _pickImage,
+                  onTap: _isLoading ? null : _pickImage,
                   child: CircleAvatar(
                     radius: 55,
                     backgroundColor: const Color(0xFF7A2B93),
                     child: _profileImageBytes == null
-                        ? const Icon(Icons.camera_alt, color: Colors.white, size: 35)
+                        ? const Icon(Icons.camera_alt,
+                            color: Colors.white, size: 35)
                         : CircleAvatar(
                             radius: 52,
                             backgroundImage: MemoryImage(_profileImageBytes!),
@@ -87,28 +134,32 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                _inputField("Username", usernameController,
-                    validator: _notEmpty),
-                _inputField("Password", passwordController,
-                    isPassword: true,
-                    validator: (v) =>
-                        v == null || v.length < 6 ? "Min 6 characters" : null),
-                _inputField("Confirm Password", confirmPasswordController,
-                    isPassword: true,
-                    validator: (v) => v != passwordController.text
-                        ? "Passwords do not match"
-                        : null),
-                _inputField("Full Name", fullNameController,
-                    validator: _notEmpty),
-                _inputField("Phone Number", phoneController,
-                    validator: _notEmpty),
-                _inputField("Email Address", emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    validator: (v) => v == null || !v.contains("@")
-                        ? "Invalid email"
-                        : null),
+                _inputField("Username", usernameController, validator: _notEmpty),
+                _inputField(
+                  "Password",
+                  passwordController,
+                  isPassword: true,
+                  validator: (v) =>
+                      v == null || v.length < 6 ? "Min 6 characters" : null,
+                ),
+                _inputField(
+                  "Confirm Password",
+                  confirmPasswordController,
+                  isPassword: true,
+                  validator: (v) => v != passwordController.text
+                      ? "Passwords do not match"
+                      : null,
+                ),
+                _inputField("Full Name", fullNameController, validator: _notEmpty),
+                _inputField("Phone Number", phoneController, validator: _notEmpty),
+                _inputField(
+                  "Email Address",
+                  emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  validator: (v) =>
+                      v == null || !v.contains("@") ? "Invalid email" : null,
+                ),
 
-                // Gender Dropdown
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   margin: const EdgeInsets.only(bottom: 18),
@@ -117,21 +168,23 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     borderRadius: BorderRadius.circular(30),
                   ),
                   child: DropdownButtonFormField<String>(
-                    initialValue: _selectedGender,
+                    value: _selectedGender,
                     hint: const Text("Select Gender"),
                     decoration: const InputDecoration(border: InputBorder.none),
                     items: ["Male", "Female"]
-                        .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                        .map((g) =>
+                            DropdownMenuItem(value: g, child: Text(g)))
                         .toList(),
                     validator: (v) =>
                         v == null ? "Please select your gender" : null,
-                    onChanged: (value) => setState(() => _selectedGender = value),
+                    onChanged: _isLoading
+                        ? null
+                        : (value) => setState(() => _selectedGender = value),
                   ),
                 ),
 
                 const SizedBox(height: 25),
 
-                // Register Button
                 SizedBox(
                   width: double.infinity,
                   height: 50,
@@ -144,8 +197,16 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     ),
                     onPressed: _isLoading ? null : _onRegisterPressed,
                     child: _isLoading
-                        ? const CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white))
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          )
                         : const Text(
                             "CREATE AN ACCOUNT",
                             style: TextStyle(
@@ -177,6 +238,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       return;
     }
 
+    if (_selectedGender == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please select your gender")),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
@@ -190,13 +258,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         profileImageBytes: _profileImageBytes!,
       );
 
+      // ✅ OPTION A: sign out right after registration
+      await _userRepo.signOut();
+
       if (!mounted) return;
       setState(() => _isLoading = false);
 
       Navigator.pushReplacementNamed(context, '/login');
     } catch (e) {
       if (!mounted) return;
-
       setState(() => _isLoading = false);
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -223,7 +293,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           hintText: label,
           filled: true,
           fillColor: const Color(0xFFE6E6E6),
-          contentPadding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+          contentPadding:
+              const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(30),
             borderSide: BorderSide.none,

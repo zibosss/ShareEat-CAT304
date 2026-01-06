@@ -35,6 +35,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadProfile();
   }
 
+  // ✅ FIXED: silent failure, NO snackbar
   Future<void> _loadProfile() async {
     setState(() => _isLoading = true);
 
@@ -43,19 +44,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (!mounted) return;
 
       if (user == null) {
-        _currentUser = null;
-        _showMsg("No profile found. Please log in again.");
+        setState(() => _currentUser = null);
         return;
       }
 
-      _currentUser = user;
-      fullNameController.text = user.fullName;
-      usernameController.text = user.username;
-      phoneController.text = user.contactNumber;
-    } catch (e) {
-      if (mounted) {
-        _showMsg("Failed to load profile. Please try again.");
-      }
+      setState(() {
+        _currentUser = user;
+        fullNameController.text = user.fullName;
+        usernameController.text = user.username;
+        phoneController.text = user.contactNumber;
+      });
+    } catch (_) {
+      // ✅ silently fail (prevents popup during registration)
+      if (!mounted) return;
+      setState(() => _currentUser = null);
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -69,6 +71,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (file != null) {
       _newProfileImageBytes = await file.readAsBytes();
+      if (!mounted) return;
       setState(() {});
     }
   }
@@ -96,15 +99,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       confirmPasswordController.clear();
       _showMsg("Password updated successfully!");
     } catch (e) {
-      _showMsg("Failed to change password: $e");
+      _showMsg("Failed to change password.");
     }
   }
 
   Future<void> _saveProfile() async {
-    if (_currentUser == null) {
-      _showMsg("No profile to save.");
-      return;
-    }
+    if (_currentUser == null) return;
+
     setState(() => _isSaving = true);
 
     try {
@@ -131,8 +132,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await _userRepo.updateUserProfile(updatedUser);
 
       _showMsg("Profile updated successfully!");
-    } catch (e) {
-      _showMsg("Failed to save profile: $e");
+    } catch (_) {
+      _showMsg("Failed to save profile.");
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
@@ -141,7 +142,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showMsg(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
@@ -152,18 +154,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
 
-    // If no profile found
+    // ✅ Clean fallback screen (no popup)
     if (_currentUser == null) {
       return Scaffold(
         appBar: AppBar(
           backgroundColor: const Color(0xFF7A2B93),
           title: const Text("My Profile"),
-          automaticallyImplyLeading: false, // ✅ removed back button
+          automaticallyImplyLeading: false,
         ),
         body: const Center(
           child: Text(
-            "No profile found.\nPlease log out and log in again.",
-            textAlign: TextAlign.center,
+            "No profile available.",
             style: TextStyle(fontSize: 16),
           ),
         ),
@@ -176,7 +177,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         backgroundColor: const Color(0xFF7A2B93),
         title: const Text("My Profile"),
         centerTitle: true,
-        automaticallyImplyLeading: false, // ✅ removed back button
+        automaticallyImplyLeading: false,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(25),
@@ -194,7 +195,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         : null),
                 child: (_newProfileImageBytes == null &&
                         _currentUser!.profileImageUrl.isEmpty)
-                    ? const Icon(Icons.person, size: 60, color: Colors.white)
+                    ? const Icon(Icons.person,
+                        size: 60, color: Colors.white)
                     : null,
               ),
             ),
@@ -329,5 +331,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    fullNameController.dispose();
+    usernameController.dispose();
+    phoneController.dispose();
+    passwordController.dispose();
+    confirmPasswordController.dispose();
+    super.dispose();
   }
 }

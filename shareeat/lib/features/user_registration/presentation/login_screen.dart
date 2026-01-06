@@ -161,7 +161,37 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                   ),
                 ),
-                const SizedBox(height: 20),
+
+                const SizedBox(height: 16),
+
+                // ✅ NEW: Don't have an account? Register
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      "Don’t have an account yet? ",
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    TextButton(
+                      onPressed: _isLoading
+                          ? null
+                          : () {
+                              Navigator.pushReplacementNamed(
+                                  context, '/register');
+                            },
+                      child: const Text(
+                        "Register",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF7A2B93),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 10),
               ],
             ),
           ),
