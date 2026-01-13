@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:shareeat/auth_prefs.dart';
 
 import '../data/user_repository.dart';
-import '../data/user_model.dart';
 
 import '../../report/presentation/admin_dashboard.dart';
 import 'home_screen.dart';

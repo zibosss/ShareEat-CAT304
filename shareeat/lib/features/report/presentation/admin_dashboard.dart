@@ -26,10 +26,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
   final AnalyticsRepository _analyticsRepo = AnalyticsRepository();
 
   int _selectedIndex = 0;
-  // all | pending | rejected | banned
   String _statusFilter = 'all';
 
-  int _trendDays = 7; 
+  int _trendDays = 7;
 
   @override
   Widget build(BuildContext context) {
@@ -122,17 +121,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
     return Column(
       children: [
-        // Filter row
-        // Filter row (simplified: just "Status" + dropdown)
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
           child: Row(
             children: [
               const Text(
                 "Status",
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(fontWeight: FontWeight.w600),
               ),
               const Spacer(),
               Container(
@@ -163,10 +158,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ],
           ),
         ),
-
         const Divider(height: 1),
-
-        // List of reports
         Expanded(
           child: StreamBuilder<List<ReportModel>>(
             stream: _reportRepo.watchReports(status: _statusFilter),
@@ -221,14 +213,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  // Card UI for each report
   Widget _reportCard(ReportModel r) {
     final createdAtLabel = DateFormat('dd MMM yyyy, hh:mm a').format(r.createdAt);
 
     return InkWell(
       borderRadius: BorderRadius.circular(18),
       onTap: () => _openReportDetail(r),
-      splashColor: purple.withValues(alpha:0.08),
+      splashColor: purple.withValues(alpha: 0.08),
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
@@ -236,7 +227,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha:0.03),
+              color: Colors.black.withValues(alpha: 0.03),
               blurRadius: 6,
               offset: const Offset(0, 2),
             ),
@@ -246,7 +237,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           children: [
             CircleAvatar(
               radius: 22,
-              backgroundColor: purple.withValues(alpha:0.12),
+              backgroundColor: purple.withValues(alpha: 0.12),
               child: const Icon(Icons.report_gmailerrorred, color: purple),
             ),
             const SizedBox(width: 12),
@@ -307,7 +298,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  // Small pill showing status
   Widget _statusChip(String status) {
     String label = status.toUpperCase();
     Color bg;
@@ -330,7 +320,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         fg = Colors.red.shade900;
         icon = Icons.block;
         break;
-      default: // for "all" or any other status
+      default:
         bg = Colors.green.shade100;
         fg = Colors.green.shade800;
         icon = Icons.check_circle;
@@ -360,252 +350,237 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  // inside _AdminDashboardState in admin_dashboard.dart
-
+  // =========================
+  // REPORT DETAIL (BOTTOM SHEET)
+  // =========================
   Future<void> _openReportDetail(ReportModel r) async {
-  await showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-    ),
-    builder: (_) {
-      return Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.report, color: purple),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      r.reportType.isEmpty ? "Report detail" : r.reportType,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (_) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.report, color: purple),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        r.reportType.isEmpty ? "Report detail" : r.reportType,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text("Reported person: ${r.reportedUsername}"),
+                Text("Reporter: ${r.reporterName}"),
 
-              const SizedBox(height: 8),
-              Text("Reported person: ${r.reportedUsername}"),
-              Text("Reporter: ${r.reporterName}"),
-
-              const SizedBox(height: 12),
-              const Text(
-                "Description",
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 4),
-              Text(r.description),
-
-              const SizedBox(height: 16),
-
-              // ==========================
-              // ✅ EVIDENCE DISPLAY (IMAGE)
-              // ==========================
-              if (r.evidenceUrl != null && r.evidenceUrl!.isNotEmpty) ...[
+                const SizedBox(height: 12),
                 const Text(
-                  "Evidence attached",
+                  "Description",
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    r.evidenceUrl!,
-                    height: 200,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    loadingBuilder: (context, child, progress) {
-                      if (progress == null) return child;
-                      return SizedBox(
-                        height: 200,
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            value: (progress.expectedTotalBytes != null)
-                                ? progress.cumulativeBytesLoaded /
-                                    (progress.expectedTotalBytes ?? 1)
-                                : null,
-                          ),
-                        ),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        height: 200,
-                        width: double.infinity,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade200,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Text("Failed to load evidence image."),
-                      );
-                    },
+                const SizedBox(height: 4),
+                Text(r.description),
+
+                const SizedBox(height: 16),
+
+                // Evidence display
+                if (r.evidenceUrl != null && r.evidenceUrl!.isNotEmpty) ...[
+                  const Text(
+                    "Evidence attached",
+                    style: TextStyle(fontWeight: FontWeight.w600),
                   ),
-                ),
-                const SizedBox(height: 16),
-              ] else ...[
-                // Optional message when no evidence
-                const Text(
-                  "No evidence attached.",
-                  style: TextStyle(fontSize: 12, color: Colors.black54),
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              const Divider(),
-              const SizedBox(height: 12),
-
-              // =======================
-              // ACTION BUTTONS
-              // =======================
-              if (r.status == 'banned') ...[
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () async {
-                          await _reportRepo.unbanUserAndRejectReport(
-                            reportId: r.id,
-                            reportedUserUid: r.reportedUserUid,
-                            adminNote:
-                                'Ban reverted – report considered fake / invalid',
-                          );
-
-                          Navigator.pop(context);
-
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                "User unbanned and report marked as REJECTED.",
-                              ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      r.evidenceUrl!,
+                      height: 200,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return SizedBox(
+                          height: 200,
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              value: (progress.expectedTotalBytes != null)
+                                  ? progress.cumulativeBytesLoaded /
+                                      (progress.expectedTotalBytes ?? 1)
+                                  : null,
                             ),
-                          );
-                        },
-                        child: const Text("Unban user & reject report"),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  "Use this if you later find the report was fake or incorrect.",
-                  style: TextStyle(fontSize: 12, color: Colors.black54),
-                ),
-              ] else ...[
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: r.status == 'rejected'
-                            ? null
-                            : () async {
-                                await _reportRepo.updateReportStatus(
-                                  reportId: r.id,
-                                  status: 'rejected',
-                                  adminNote: 'No action taken',
-                                );
-                                Navigator.pop(context);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      "Report marked as 'Do not take action'.",
-                                    ),
-                                  ),
-                                );
-                              },
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(
-                            color: r.status == 'rejected'
-                                ? Colors.grey
-                                : Colors.grey.shade600,
                           ),
-                        ),
-                        child: const Text("Do not take action"),
-                      ),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          height: 200,
+                          width: double.infinity,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade200,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text("Failed to load evidence image."),
+                        );
+                      },
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: r.status == 'banned'
-                            ? null
-                            : () async {
-                                final confirm = await showDialog<bool>(
-                                  context: context,
-                                  builder: (_) => AlertDialog(
-                                    title: const Text("Ban user"),
-                                    content: Text(
-                                      "Ban ${r.reportedUsername.isEmpty ? 'this user' : r.reportedUsername} from ShareEat?",
+                  ),
+                  const SizedBox(height: 16),
+                ] else ...[
+                  const Text(
+                    "No evidence attached.",
+                    style: TextStyle(fontSize: 12, color: Colors.black54),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                const Divider(),
+                const SizedBox(height: 12),
+
+                // Action buttons
+                if (r.status == 'banned') ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () async {
+                            await _reportRepo.unbanUserAndRejectReport(
+                              reportId: r.id,
+                              reportedUserUid: r.reportedUserUid,
+                              adminNote: 'Ban reverted – report considered fake / invalid',
+                            );
+
+                            Navigator.pop(context);
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("User unbanned and report marked as REJECTED."),
+                              ),
+                            );
+                          },
+                          child: const Text("Unban user & reject report"),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    "Use this if you later find the report was fake or incorrect.",
+                    style: TextStyle(fontSize: 12, color: Colors.black54),
+                  ),
+                ] else ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: r.status == 'rejected'
+                              ? null
+                              : () async {
+                                  await _reportRepo.updateReportStatus(
+                                    reportId: r.id,
+                                    status: 'rejected',
+                                    adminNote: 'No action taken',
+                                  );
+                                  Navigator.pop(context);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text("Report marked as 'Do not take action'."),
                                     ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(context, false),
-                                        child: const Text("Cancel"),
-                                      ),
-                                      ElevatedButton(
-                                        onPressed: () =>
-                                            Navigator.pop(context, true),
-                                        child: const Text("Ban"),
-                                      ),
-                                    ],
-                                  ),
-                                );
-
-                                if (confirm != true) return;
-
-                                await _reportRepo.banUserAndMarkReport(
-                                  reportId: r.id,
-                                  reportedUserUid: r.reportedUserUid,
-                                  adminNote: 'User banned by admin',
-                                );
-
-                                Navigator.pop(context);
-
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    backgroundColor: Colors.red,
-                                    content: Text("User banned and report updated."),
-                                  ),
-                                );
-                              },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          foregroundColor: Colors.white,
+                                  );
+                                },
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                              color: r.status == 'rejected'
+                                  ? Colors.grey
+                                  : Colors.grey.shade600,
+                            ),
+                          ),
+                          child: const Text("Do not take action"),
                         ),
-                        child: const Text("Ban user & close report"),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  "Banned users will not be able to access ShareEat.",
-                  style: TextStyle(fontSize: 12, color: Colors.black54),
-                ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: r.status == 'banned'
+                              ? null
+                              : () async {
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (_) => AlertDialog(
+                                      title: const Text("Ban user"),
+                                      content: Text(
+                                        "Ban ${r.reportedUsername.isEmpty ? 'this user' : r.reportedUsername} from ShareEat?",
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(context, false),
+                                          child: const Text("Cancel"),
+                                        ),
+                                        ElevatedButton(
+                                          onPressed: () => Navigator.pop(context, true),
+                                          child: const Text("Ban"),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+
+                                  if (confirm != true) return;
+
+                                  await _reportRepo.banUserAndMarkReport(
+                                    reportId: r.id,
+                                    reportedUserUid: r.reportedUserUid,
+                                    adminNote: 'User banned by admin',
+                                  );
+
+                                  Navigator.pop(context);
+
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      backgroundColor: Colors.red,
+                                      content: Text("User banned and report updated."),
+                                    ),
+                                  );
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text("Ban user & close report"),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    "Banned users will not be able to access ShareEat.",
+                    style: TextStyle(fontSize: 12, color: Colors.black54),
+                  ),
+                ],
+                const SizedBox(height: 12),
               ],
-
-              const SizedBox(height: 12),
-            ],
+            ),
           ),
-        ),
-      );
-    },
-  );
-}
-
-
+        );
+      },
+    );
+  }
 
   // =========================
   // ANALYTICS TAB
@@ -640,7 +615,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
         final halal = halalCounts['halal'] ?? 0;
         final nonHalal = halalCounts['nonHalal'] ?? 0;
-
         final notAvailableOrExpired = math.max(0, totalFoods - availableFoods);
 
         return ListView(
@@ -720,32 +694,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
             const SizedBox(height: 16),
 
             _foodsTrendCard(trend),
-/*
-            const SizedBox(height: 24),
-
-            const Text(
-              "Top Food Types",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 10),
-            if (topTypes.isEmpty)
-              const Text(
-                "No type/category data found. (If you don’t use category, it’s okay to ignore this.)",
-              ),
-            ...topTypes.map(
-              (e) => Card(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: ListTile(
-                  title: Text(e['type'].toString()),
-                  trailing: Text(
-                    e['total'].toString(),
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-            ),*/
 
             const SizedBox(height: 24),
 
@@ -775,7 +723,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
   // =========================
   // TREND CARD / CHART / KPI / DONUT
   // =========================
-
   Widget _foodsTrendCard(List<Map<String, dynamic>> trend) {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -818,13 +765,18 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 child: Text("No trend data."),
               )
             else
-              _barChart(trend),
+              // ✅ FIX: fixed height chart so 30D won't overflow on small screens
+              SizedBox(
+                height: 190,
+                child: _barChart(trend),
+              ),
           ],
         ),
       ),
     );
   }
 
+  // ✅ FIXED CHART (no AspectRatio)
   Widget _barChart(List<Map<String, dynamic>> data) {
     if (data.isEmpty) return const SizedBox.shrink();
 
@@ -834,114 +786,98 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
     String shortLabel(String yyyyMmDd) => yyyyMmDd.split('-').last;
 
-    final barsCount = data.length;
-    final aspect = (barsCount <= 7)
-        ? 2.2
-        : (barsCount <= 14)
-            ? 2.6
-            : 3.2;
+    const xLabelSpace = 16.0;
+    const captionSpace = 16.0;
+    const topValueSpace = 14.0;
 
-    const xLabelSpace = 18.0;
-    const captionSpace = 18.0;
-    const topValueSpace = 16.0;
+    return LayoutBuilder(
+      builder: (context, c) {
+        final barsAreaHeight =
+            (c.maxHeight - xLabelSpace - captionSpace - topValueSpace)
+                .clamp(50.0, double.infinity);
 
-    return AspectRatio(
-      aspectRatio: aspect,
-      child: LayoutBuilder(
-        builder: (context, c) {
-          final barsAreaHeight =
-              (c.maxHeight - xLabelSpace - captionSpace - topValueSpace)
-                  .clamp(40.0, double.infinity);
+        return Column(
+          children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: List.generate(data.length, (i) {
+                    final total = (data[i]['total'] as int?) ?? 0;
+                    final ratio = maxVal == 0 ? 0.0 : total / maxVal;
+                    final barH =
+                        (ratio * barsAreaHeight).clamp(2.0, barsAreaHeight);
 
-          return Column(
-            children: [
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: List.generate(data.length, (i) {
-                      final total = (data[i]['total'] as int?) ?? 0;
-                      final ratio = maxVal == 0 ? 0.0 : total / maxVal;
-                      final barH =
-                          (ratio * barsAreaHeight).clamp(2.0, barsAreaHeight);
+                    final showLabel =
+                        _trendDays == 7 ? true : (i % 5 == 0 || i == data.length - 1);
 
-                      final showLabel = _trendDays == 7
-                          ? true
-                          : (i % 5 == 0 || i == data.length - 1);
-
-                      return Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 2),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              SizedBox(
-                                height: topValueSpace,
-                                child: (_trendDays == 7 && total > 0)
-                                    ? FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        child: Text(
-                                          "$total",
-                                          style: const TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                          ),
+                    return Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            SizedBox(
+                              height: topValueSpace,
+                              child: (_trendDays == 7 && total > 0)
+                                  ? FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text(
+                                        "$total",
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600,
                                         ),
+                                      ),
+                                    )
+                                  : const SizedBox.shrink(),
+                            ),
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 250),
+                              height: barH,
+                              decoration: BoxDecoration(
+                                color: purple,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                            ),
+                            SizedBox(
+                              height: xLabelSpace,
+                              child: Center(
+                                child: showLabel
+                                    ? Text(
+                                        shortLabel(data[i]['day'].toString()),
+                                        style: const TextStyle(fontSize: 9),
                                       )
                                     : const SizedBox.shrink(),
                               ),
-                              AnimatedContainer(
-                                duration:
-                                    const Duration(milliseconds: 250),
-                                height: barH,
-                                decoration: BoxDecoration(
-                                  color: purple,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                              ),
-                              SizedBox(
-                                height: xLabelSpace,
-                                child: Center(
-                                  child: showLabel
-                                      ? Text(
-                                          shortLabel(
-                                              data[i]['day'].toString()),
-                                          style:
-                                              const TextStyle(fontSize: 10),
-                                        )
-                                      : const SizedBox.shrink(),
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      );
-                    }),
-                  ),
+                      ),
+                    );
+                  }),
                 ),
               ),
-              SizedBox(
-                height: captionSpace,
-                child: Center(
-                  child: Text(
-                    _trendDays == 7
-                        ? "Last 7 days (day of month)"
-                        : "Last 30 days (labels every 5 days)",
-                    style: const TextStyle(
-                        fontSize: 12, color: Colors.black54),
-                  ),
+            ),
+            SizedBox(
+              height: captionSpace,
+              child: Center(
+                child: Text(
+                  _trendDays == 7
+                      ? "Last 7 days (day of month)"
+                      : "Last 30 days (labels every 5 days)",
+                  style: const TextStyle(fontSize: 11, color: Colors.black54),
                 ),
               ),
-            ],
-          );
-        },
-      ),
+            ),
+          ],
+        );
+      },
     );
   }
 
-  Widget _trendChip(String label,
-      {required bool isActive, required VoidCallback onTap}) {
+  Widget _trendChip(String label, {required bool isActive, required VoidCallback onTap}) {
     return InkWell(
       borderRadius: BorderRadius.circular(999),
       onTap: onTap,
@@ -979,8 +915,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               const SizedBox(height: 6),
               Text(
                 "$value",
-                style: const TextStyle(
-                    fontSize: 22, fontWeight: FontWeight.bold),
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -1007,8 +942,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           children: [
             Text(
               title,
-              style:
-                  const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 10),
             Row(
@@ -1022,13 +956,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         aValue: aValue,
                         bValue: bValue,
                         aColor: purple,
-                        bColor: Colors.grey.shade400,
+                        bColor: Colors.grey,
                       ),
                       child: Center(
                         child: Text(
                           "${aValue + bValue}",
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 14),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                         ),
                       ),
                     ),
@@ -1041,7 +974,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     children: [
                       _legendRow(aLabel, aValue, purple),
                       const SizedBox(height: 8),
-                      _legendRow(bLabel, bValue, Colors.grey.shade400),
+                      _legendRow(bLabel, bValue, Colors.grey),
                     ],
                   ),
                 ),
@@ -1062,13 +995,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 8),
-        Expanded(
-          child: Text(label, style: const TextStyle(fontSize: 12)),
-        ),
+        Expanded(child: Text(label, style: const TextStyle(fontSize: 12))),
         Text(
           "$value",
-          style: const TextStyle(
-              fontWeight: FontWeight.bold, fontSize: 12),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
         ),
       ],
     );
